@@ -28,14 +28,14 @@ tmux-agent-status 는 `busy` 나 `waiting` 을 한 번이라도 거친 세션만
 사용자가 먼저 봐야 하는 상태가 왼쪽에 온다.
 
 ```
- 2  ● 1 ● 2  claude
+ 2  ●1 ●2  claude
 ```
 
 pane 제목에는 그 pane 하나의 상태가 나온다. `busy` 이면 그 상태로 있은 시간이
 뒤에 붙는다.
 
 ```
- 1  ● 49s  Jupiter tmux 커스텀
+ 1  ●49s  Jupiter tmux 커스텀
 ```
 
 ## 설치

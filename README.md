@@ -29,14 +29,14 @@ The window tab carries a count per state for the panes in that window. The
 order is fixed, and the state that most needs your attention comes first.
 
 ```
- 2  ● 1 ● 2  claude
+ 2  ●1 ●2  claude
 ```
 
 The pane title carries the state of that one pane. For `busy` it is followed by
 how long the pane has been in that state.
 
 ```
- 1  ● 49s  Jupiter tmux setup
+ 1  ●49s  Jupiter tmux setup
 ```
 
 ## Installation

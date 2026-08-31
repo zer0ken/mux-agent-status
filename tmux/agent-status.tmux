@@ -19,7 +19,7 @@ tmux set -gq @agent_glyph         "●"
 badge=""
 for st in waiting idle busy; do
   if [ "$st" = busy ]; then
-    body='#{@agent_glyph} #{@agent_elapsed}'
+    body='#{@agent_glyph}#{@agent_elapsed}'   # 표식과 경과 시간은 붙여 쓴다
   else
     body='#{@agent_glyph} '
   fi
