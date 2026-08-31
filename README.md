@@ -16,25 +16,35 @@ The default palette is catppuccin mocha.
 | --- | --- | --- |
 | `waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | The session is waiting for input |
 | `idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | The session has finished responding |
-| `busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | The session is running. Elapsed time is shown alongside |
+| `busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | The session is running |
 
-A session that has just been started and has not done any work yet carries no
-indicator. `idle` is the same value for a session that finished responding and for
-one that never worked, so tmux-agent-status only reports `idle` for sessions it
-has seen in `busy` or `waiting` at least once.
+A session that has just been started and has not done any work yet stays off the
+status bar. Claude Code reports `idle` for such a session and for one that
+finished responding alike, so tmux-agent-status only shows `idle` for sessions
+it has seen in `busy` or `waiting` at least once.
 
-## Placement
+## Indicators
 
-The window indicator carries one marker and counter per state for the panes in
-that window. The order is fixed, and the state that most needs your attention
-comes first.
+tmux-agent-status publishes two indicators. The window indicator stands for one
+window, the pane indicator for one pane. The parts an indicator is built from
+each have a name.
+
+| Name | Appears in | Meaning |
+| --- | --- | --- |
+| marker | both indicators | A dot carrying the state as a color and a glyph |
+| counter | window indicator | How many panes are in that state |
+| clock | pane indicator | How long the session has been `busy` |
+
+The window indicator counts the panes of a window per state and lays out a
+marker and a counter for each. The order is fixed at `waiting`, `idle`, `busy`,
+and a state with no pane in it is left out.
 
 ```
  2  ● 1 ● 2  claude
 ```
 
-The pane indicator carries the marker for that one pane. For `busy` a clock
-follows, showing how long the pane has been in that state.
+The pane indicator carries the marker for that one pane. In `busy` a clock
+follows the marker.
 
 ```
  1  ● 49s  Jupiter tmux setup
@@ -47,15 +57,15 @@ git clone https://github.com/zer0ken/tmux-agent-status.git ~/tmux-agent-status
 ```
 
 Add one line to tmux.conf that calls the entry point. The entry point fills in
-the option defaults and starts the ticker.
+the option defaults and starts the ticker, a background process that reads the
+state and carries it into tmux options.
 
 ```tmux
 run-shell "~/tmux-agent-status/tmux/agent-status.tmux"
 ```
 
-The entry point only writes the indicator strings into options. It does not
-rewrite your status bar format. Splice the indicators into the format you
-already use.
+The entry point only writes the indicators into options. It does not rewrite
+your status bar format. Splice the indicators into the format you already use.
 
 ```tmux
 set -g window-status-format "#I #{E:@agent_window_indicator}#W"
@@ -65,8 +75,8 @@ set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_titl
 ## pi support
 
 pi publishes neither a list of running sessions nor a state file, so this
-repository ships a pi extension that records the state itself. Install it with
-pi and no other package is needed.
+repository ships a pi extension that records the state itself. Install the
+extension with pi; no other package is needed.
 
 ```bash
 pi install git:github.com/zer0ken/tmux-agent-status
@@ -79,8 +89,7 @@ of tmux-agent-status, so nothing is translated in between.
 
 ## Options
 
-The ticker reads the colors and the markers once at startup. Changing them
-takes effect after the tmux configuration is sourced again. Values set in
+An option takes effect within a second of being changed. Values set in
 tmux.conf before the entry point runs win, because the entry point writes its
 defaults with `set -ogq`.
 
@@ -99,25 +108,27 @@ defaults with `set -ogq`.
 
 ## How it works
 
-The state comes from what each agent records about itself. Claude Code keeps
-`~/.claude/sessions/<pid>.json` up to date for every session, and pi keeps
-`$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` up to date through the extension in
-`pi/`. tmux-agent-status installs no Claude Code hooks and scans no process
-table.
+The state comes from what each agent records about itself. tmux-agent-status
+installs no Claude Code hooks and scans no process table.
+
+| Agent | State file |
+| --- | --- |
+| Claude Code | `~/.claude/sessions/<pid>.json` |
+| pi | `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` |
 
 The Claude Code session file carries the id of the pane the session runs in, in
 its `tmux` field, so there is no need to map a pid to a tty and a tty to a pane.
 The file is single-line JSON, which bash reads with a regular expression, and
 that path spawns no processes at all.
 
-`bin/agent-status.sh` is a ticker that runs once a second. It covers the two
+`bin/agent-status.sh` is the ticker. It runs once a second and covers the two
 things a tmux format cannot do on its own.
 
 - Carrying the state files into pane options
 - Counting the panes of a window per state
 
-The ticker does not call tmux when nothing has changed. One ticker runs per tmux
-server and ends when that server ends.
+The ticker writes options only for the panes and windows whose values changed.
+One ticker runs per tmux server and ends when that server ends.
 
 ## Limitations
 
@@ -128,10 +139,10 @@ so this distinction cannot be recovered.
 
 **The session file path is not a public interface.** `~/.claude/sessions` is
 internal to Claude Code and may move between versions. If the files become
-unreadable, only the indicators for Claude sessions disappear; pi sessions and tmux
-keep working. The same values are published through `claude agents --json`, so
-the ticker can be pointed at that command instead. That call costs about 400
-milliseconds, so the polling interval has to grow with it.
+unreadable, only the indicators for Claude sessions disappear; pi sessions and
+tmux keep working. The same values are published through `claude agents --json`,
+so pointing the ticker at that command brings them back. That call costs about
+400 milliseconds, so the polling interval has to grow with it.
 
 ## Requirements
 

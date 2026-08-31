@@ -28,14 +28,14 @@ tmux set -ogq @agent_counter_color ""
 tmux set -ogq @agent_clock_color   ""
 
 # pane indicator. pane-border-format 에 끼워 쓴다. marker 하나로 그 pane 의
-# 상태를 나타내고, busy 이면 뒤에 clock 이 붙는다.
-clock_fg=$(tmux show-option -gqv @agent_clock_color 2>/dev/null)
-[ -n "$clock_fg" ] && clock_fg="#[fg=$clock_fg]"
+# 상태를 나타내고, busy 이면 뒤에 clock 이 붙는다. 색과 글리프는 값을 박지 않고
+# 옵션을 가리키므로, 옵션을 바꾸면 다음 화면 갱신에 바로 반영된다.
+clock="#{?#{@agent_clock_color},#[fg=#{@agent_clock_color}],}#{@agent_clock}"
 
 ind=""
 for st in waiting idle busy; do
   if [ "$st" = busy ]; then
-    body="#{@agent_marker_$st} ${clock_fg}#{@agent_clock}"
+    body="#{@agent_marker_$st} $clock"
   else
     body="#{@agent_marker_$st} "
   fi

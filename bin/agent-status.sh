@@ -27,13 +27,16 @@ STATE_DIR="${TMPDIR:-/tmp}/tmux-agent-status-$(id -u)"
 ORDER=(waiting idle busy)
 
 # marker 의 색과 글리프는 상태마다 따로 정한다. counter 는 색을 비워 두면
-# 자기 marker 의 색을 따른다. 시작할 때 한 번만 읽는다.
+# 자기 marker 의 색을 따른다. 매 틱마다 읽으므로 옵션을 바꾸면 바로 반영된다.
 declare -A COLOR MARKER
-_v=$(tmux display-message -p '#{@agent_marker_color_waiting}|#{@agent_marker_color_idle}|#{@agent_marker_color_busy}|#{@agent_text_color}|#{@agent_marker_waiting}|#{@agent_marker_idle}|#{@agent_marker_busy}|#{@agent_counter_color}' 2>/dev/null)
-IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_COLOR <<< "$_v"
-COLOR=(  [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
-MARKER=( [waiting]="${m_wait:-●}"       [idle]="${m_idle:-●}"       [busy]="${m_busy:-●}" )
-TEXT_COLOR="${c_text:-#cdd6f4}"
+read_options() {
+  local v c_wait c_idle c_busy c_text m_wait m_idle m_busy
+  v=$(tmux display-message -p '#{@agent_marker_color_waiting}|#{@agent_marker_color_idle}|#{@agent_marker_color_busy}|#{@agent_text_color}|#{@agent_marker_waiting}|#{@agent_marker_idle}|#{@agent_marker_busy}|#{@agent_counter_color}' 2>/dev/null) || return
+  IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_COLOR <<< "$v"
+  COLOR=(  [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
+  MARKER=( [waiting]="${m_wait:-●}"       [idle]="${m_idle:-●}"       [busy]="${m_busy:-●}" )
+  TEXT_COLOR="${c_text:-#cdd6f4}"
+}
 
 ready=""
 for _ in $(seq "$STARTUP_TRIES"); do
@@ -56,6 +59,7 @@ shopt -s nullglob
 
 while :; do
   now=$EPOCHSECONDS
+  read_options
   declare -A state=() started=()
 
   # ── Claude Code 세션 파일 ──────────────────────────────────
