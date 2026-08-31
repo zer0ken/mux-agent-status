@@ -29,11 +29,11 @@ ORDER=(waiting idle busy)
 # marker 의 색과 글리프는 상태마다 따로 정한다. counter 는 색을 비워 두면
 # 자기 marker 의 색을 따른다. 시작할 때 한 번만 읽는다.
 declare -A COLOR MARKER
-_v=$(tmux display-message -p '#{@agent_color_waiting}|#{@agent_color_idle}|#{@agent_color_busy}|#{@agent_color_text}|#{@agent_marker_waiting}|#{@agent_marker_idle}|#{@agent_marker_busy}|#{@agent_counter_color}' 2>/dev/null)
-IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_FG <<< "$_v"
+_v=$(tmux display-message -p '#{@agent_marker_color_waiting}|#{@agent_marker_color_idle}|#{@agent_marker_color_busy}|#{@agent_text_color}|#{@agent_marker_waiting}|#{@agent_marker_idle}|#{@agent_marker_busy}|#{@agent_counter_color}' 2>/dev/null)
+IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_COLOR <<< "$_v"
 COLOR=(  [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
 MARKER=( [waiting]="${m_wait:-●}"       [idle]="${m_idle:-●}"       [busy]="${m_busy:-●}" )
-TEXT_FG="${c_text:-#cdd6f4}"
+TEXT_COLOR="${c_text:-#cdd6f4}"
 
 ready=""
 for _ in $(seq "$STARTUP_TRIES"); do
@@ -127,13 +127,13 @@ while :; do
     for s in "${ORDER[@]}"; do
       n=${count[$wid/$s]:-0}
       [ "$n" -gt 0 ] || continue
-      if [ -n "${COUNTER_FG:-}" ]; then
-      ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} #[fg=$COUNTER_FG]$n "
+      if [ -n "${COUNTER_COLOR:-}" ]; then
+      ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} #[fg=$COUNTER_COLOR]$n "
     else
       ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} $n "
     fi
     done
-    [ -n "$ind" ] && ind+="#[fg=$TEXT_FG]"
+    [ -n "$ind" ] && ind+="#[fg=$TEXT_COLOR]"
     [ "$ind" = "${prev_ind[$wid]:-}" ] && continue
     if [ -n "$ind" ]; then tmux set-option -w -t "$wid" @agent_window_indicator "$ind" 2>/dev/null
     else tmux set-option -w -t "$wid" -u @agent_window_indicator 2>/dev/null; fi

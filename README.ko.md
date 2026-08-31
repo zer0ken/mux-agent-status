@@ -81,16 +81,16 @@ tmux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 �
 
 | 옵션 | 기본값 | 뜻 |
 | --- | --- | --- |
-| `@agent_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | `waiting` 의 색 |
-| `@agent_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | `idle` 의 색 |
-| `@agent_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | `busy` 의 색 |
-| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | indicator 뒤에 오는 글자의 색 |
 | `@agent_marker` | `●` | 세 상태의 기본 marker |
 | `@agent_marker_waiting` | `@agent_marker` | `waiting` 의 marker |
 | `@agent_marker_idle` | `@agent_marker` | `idle` 의 marker |
 | `@agent_marker_busy` | `@agent_marker` | `busy` 의 marker |
+| `@agent_marker_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | `waiting` marker 의 색 |
+| `@agent_marker_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | `idle` marker 의 색 |
+| `@agent_marker_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | `busy` marker 의 색 |
 | `@agent_counter_color` | 비움 | counter 의 색. 비우면 marker 색을 따른다 |
 | `@agent_clock_color` | 비움 | clock 의 색. 비우면 marker 색을 따른다 |
+| `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | indicator 뒤에 오는 글자의 색 |
 
 ## 동작 원리
 

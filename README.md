@@ -86,16 +86,16 @@ defaults with `set -ogq`.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `@agent_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | Color for `waiting` |
-| `@agent_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | Color for `idle` |
-| `@agent_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | Color for `busy` |
-| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | Color of the text that follows an indicator |
 | `@agent_marker` | `●` | Default marker for all three states |
 | `@agent_marker_waiting` | `@agent_marker` | Marker for `waiting` |
 | `@agent_marker_idle` | `@agent_marker` | Marker for `idle` |
 | `@agent_marker_busy` | `@agent_marker` | Marker for `busy` |
+| `@agent_marker_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | Color of the `waiting` marker |
+| `@agent_marker_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | Color of the `idle` marker |
+| `@agent_marker_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | Color of the `busy` marker |
 | `@agent_counter_color` | empty | Color of the counter. Empty follows the marker |
 | `@agent_clock_color` | empty | Color of the clock. Empty follows the marker |
+| `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | Color of the text that follows an indicator |
 
 ## How it works
 

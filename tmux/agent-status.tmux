@@ -9,10 +9,10 @@ set -u
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 색의 뜻은 claude-session-manager 의 세션 피커와 같다.
-tmux set -ogq @agent_color_waiting "#f9e2af"
-tmux set -ogq @agent_color_idle    "#a6e3a1"
-tmux set -ogq @agent_color_busy    "#f38ba8"
-tmux set -ogq @agent_color_text    "#cdd6f4"
+tmux set -ogq @agent_marker_color_waiting "#f9e2af"
+tmux set -ogq @agent_marker_color_idle    "#a6e3a1"
+tmux set -ogq @agent_marker_color_busy    "#f38ba8"
+tmux set -ogq @agent_text_color    "#cdd6f4"
 
 # marker 는 상태마다 따로 정한다. @agent_marker 를 미리 정해 두면 세 상태의
 # 기본값이 한꺼번에 바뀐다.
@@ -39,7 +39,7 @@ for st in waiting idle busy; do
   else
     body="#{@agent_marker_$st} "
   fi
-  ind+="#{?#{==:#{@agent_pane_state},$st},#[fg=#{@agent_color_$st}]$body#[fg=#{@agent_color_text}],"
+  ind+="#{?#{==:#{@agent_pane_state},$st},#[fg=#{@agent_marker_color_$st}]$body#[fg=#{@agent_text_color}],"
 done
 ind+="}}}"
 tmux set -ogq @agent_pane_indicator "$ind"
