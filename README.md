@@ -41,9 +41,6 @@ how long the pane has been in that state.
 
 ## Installation
 
-tmux-agent-status uses no Claude Code hooks. install.sh only removes hooks left
-behind by an earlier version, so a fresh installation does not need to run it.
-
 ```bash
 git clone https://github.com/zer0ken/tmux-agent-status.git ~/tmux-agent-status
 ```

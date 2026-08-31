@@ -22,20 +22,18 @@ STARTUP_TRIES=30
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
 STATE_DIR="${TMPDIR:-/tmp}/tmux-agent-status-$(id -u)"
-TEXT_FG="#cdd6f4"
 
 # 창 요약에 나오는 순서. 사용자가 먼저 봐야 하는 것이 왼쪽이다.
 ORDER=(waiting idle busy)
 
 # 색과 글리프는 tmux 옵션으로 바꾼다. 기본값은 claude-session-manager 와 같은
 # 뜻이고 catppuccin mocha 팔레트를 쓴다. 시작할 때 한 번만 읽는다.
-declare -A GLYPH COLOR
+declare -A COLOR
 _v=$(tmux display-message -p '#{@agent_color_waiting}|#{@agent_color_idle}|#{@agent_color_busy}|#{@agent_color_text}|#{@agent_glyph}' 2>/dev/null)
 IFS='|' read -r c_wait c_idle c_busy c_text glyph <<< "$_v"
 COLOR=( [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
-TEXT_FG="${c_text:-$TEXT_FG}"
-glyph="${glyph:-●}"
-GLYPH=( [waiting]="$glyph" [idle]="$glyph" [busy]="$glyph" )
+TEXT_FG="${c_text:-#cdd6f4}"
+GLYPH="${glyph:-●}"
 
 ready=""
 for _ in $(seq "$STARTUP_TRIES"); do
@@ -129,7 +127,7 @@ while :; do
     for s in "${ORDER[@]}"; do
       n=${count[$wid/$s]:-0}
       [ "$n" -gt 0 ] || continue
-      badge+="#[fg=${COLOR[$s]}]${GLYPH[$s]} $n "
+      badge+="#[fg=${COLOR[$s]}]$GLYPH $n "
     done
     [ -n "$badge" ] && badge+="#[fg=$TEXT_FG]"
     [ "$badge" = "${prev_win[$wid]:-}" ] && continue

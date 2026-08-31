@@ -40,9 +40,6 @@ pane 제목에는 그 pane 하나의 상태가 나온다. `busy` 이면 그 상�
 
 ## 설치
 
-tmux-agent-status 는 Claude Code 훅을 쓰지 않는다. install.sh 는 이전 판이
-남긴 훅만 걷어내므로, 새로 설치하는 경우에는 실행하지 않아도 된다.
-
 ```bash
 git clone https://github.com/zer0ken/tmux-agent-status.git ~/tmux-agent-status
 ```
