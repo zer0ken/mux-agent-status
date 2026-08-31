@@ -7,13 +7,13 @@ tmux-agent-status 는 tmux 상태바에 Claude Code 와 pi 세션의 상태를 �
 ## 상태 구분
 
 상태는 세 가지다. 어휘와 색은 claude-session-manager 의 세션 피커와 같아서,
-피커와 상태바가 같은 뜻으로 읽힌다.
+피커와 상태바가 같은 뜻으로 읽힌다. 기본 팔레트는 catppuccin mocha 다.
 
-| 상태 | 표시 | 뜻 |
+| 상태 | 색 | 뜻 |
 | --- | --- | --- |
-| `waiting` | 노란 점 | 세션이 입력을 기다린다 |
-| `idle` | 초록 점 | 세션이 응답을 마쳤다 |
-| `busy` | 빨간 점과 경과 시간 | 세션이 돌고 있다 |
+| `waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | 세션이 입력을 기다린다 |
+| `idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | 세션이 응답을 마쳤다 |
+| `busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | 세션이 돌고 있다. 경과 시간이 함께 나온다 |
 
 세션을 띄우고 아직 아무 작업도 하지 않은 동안에는 배지가 붙지 않는다.
 `idle` 은 응답을 마친 세션과 한 번도 일한 적 없는 세션이 같은 값이므로,
@@ -79,10 +79,10 @@ pi 의 `working` 은 `busy` 로, `asking` 은 `waiting` 으로, `idle` 은 `idle
 
 | 옵션 | 기본값 | 뜻 |
 | --- | --- | --- |
-| `@agent_color_waiting` | `#f9e2af` | `waiting` 의 색 |
-| `@agent_color_idle` | `#a6e3a1` | `idle` 의 색 |
-| `@agent_color_busy` | `#f38ba8` | `busy` 의 색 |
-| `@agent_color_text` | `#cdd6f4` | 배지 뒤에 오는 글자의 색 |
+| `@agent_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | `waiting` 의 색 |
+| `@agent_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | `idle` 의 색 |
+| `@agent_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | `busy` 의 색 |
+| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | 배지 뒤에 오는 글자의 색 |
 | `@agent_glyph` | `●` | 세 상태가 함께 쓰는 글리프 |
 
 ## 동작 원리
