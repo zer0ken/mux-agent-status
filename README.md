@@ -65,15 +65,18 @@ set -wg pane-border-format  "#{pane_index} #{E:@agent_badge_pane}#{pane_title}"
 
 ## pi support
 
-The state of a pi session comes from the file that the pi-tmux-status extension
-writes to `/tmp/pi-tmux-<pane>.txt`. Install that extension alongside pi.
+pi publishes neither a list of running sessions nor a state file, so this
+repository ships a pi extension that records the state itself. Install it with
+pi and no other package is needed.
 
 ```bash
-pi install npm:pi-tmux-status
+pi install git:github.com/zer0ken/tmux-agent-status
 ```
 
-pi reports `working`, `asking` and `idle`, which map to `busy`, `waiting` and
-`idle`.
+The extension writes `<state> <pid>` to
+`$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` on every state change and removes
+the file when the session ends. It uses the same three state names as the rest
+of tmux-agent-status, so nothing is translated in between.
 
 ## Options
 
@@ -92,8 +95,9 @@ effect after the tmux configuration is sourced again.
 
 The state comes from what each agent records about itself. Claude Code keeps
 `~/.claude/sessions/<pid>.json` up to date for every session, and pi keeps
-`/tmp/pi-tmux-<pane>.txt` up to date through the pi-tmux-status extension.
-tmux-agent-status installs no hooks and scans no process table.
+`$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` up to date through the extension in
+`pi/`. tmux-agent-status installs no Claude Code hooks and scans no process
+table.
 
 The Claude Code session file carries the id of the pane the session runs in, in
 its `tmux` field, so there is no need to map a pid to a tty and a tty to a pane.

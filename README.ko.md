@@ -64,15 +64,17 @@ set -wg pane-border-format  "#{pane_index} #{E:@agent_badge_pane}#{pane_title}"
 
 ## pi 연동
 
-pi 세션의 상태는 pi-tmux-status 확장이 `/tmp/pi-tmux-<pane>.txt` 에 쓴 값을
-읽어서 가져온다. pi 를 쓰면 이 확장을 함께 설치한다.
+pi 는 실행 중인 세션의 목록도 상태 파일도 내보내지 않는다. 그래서 이 저장소가
+상태를 기록하는 pi 확장을 함께 담고 있다. pi 로 설치하면 되고 다른 패키지는
+필요 없다.
 
 ```bash
-pi install npm:pi-tmux-status
+pi install git:github.com/zer0ken/tmux-agent-status
 ```
 
-pi 의 `working` 은 `busy` 로, `asking` 은 `waiting` 으로, `idle` 은 `idle` 로
-대응한다.
+확장은 상태가 바뀔 때마다 `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` 에
+`<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. 상태 이름은
+tmux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
 
 ## 옵션
 
@@ -90,9 +92,9 @@ pi 의 `working` 은 `busy` 로, `asking` 은 `waiting` 으로, `idle` 은 `idle
 ## 동작 원리
 
 상태는 에이전트가 스스로 기록한 것을 읽는다. Claude Code 는 세션마다
-`~/.claude/sessions/<pid>.json` 을 갱신하고, pi 는 pi-tmux-status 확장이
-`/tmp/pi-tmux-<pane>.txt` 를 갱신한다. tmux-agent-status 는 훅을 걸지 않고
-프로세스를 뒤지지도 않는다.
+`~/.claude/sessions/<pid>.json` 을 갱신하고, pi 는 `pi/` 의 확장이
+`$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` 을 갱신한다. tmux-agent-status 는
+Claude Code 훅을 걸지 않고 프로세스를 뒤지지도 않는다.
 
 Claude Code 의 세션 파일에는 그 세션이 붙어 있는 pane 의 id 가 `tmux` 필드로
 들어 있어서, pid 를 tty 로 옮기고 다시 pane 으로 옮기는 과정이 필요 없다.
