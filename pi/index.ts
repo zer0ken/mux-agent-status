@@ -33,7 +33,7 @@ export default function (pi: ExtensionAPI) {
   let state: State = "idle";
   let interactive = 0;
 
-  // 상태 파일을 못 써도 pi 는 그대로 돈다. 배지만 안 나온다.
+  // 상태 파일을 못 써도 pi 는 그대로 돈다. indicator 만 안 나온다.
   const write = () => {
     try {
       mkdirSync(dir, { recursive: true });

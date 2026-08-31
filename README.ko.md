@@ -17,25 +17,25 @@ tmux-agent-status 는 tmux 상태바에 Claude Code 와 pi 세션의 상태를 �
 | `idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | 세션이 응답을 마쳤다 |
 | `busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | 세션이 돌고 있다. 경과 시간이 함께 나온다 |
 
-세션을 띄우고 아직 아무 작업도 하지 않은 동안에는 배지가 붙지 않는다.
+세션을 띄우고 아직 아무 작업도 하지 않은 동안에는 indicator 가 붙지 않는다.
 `idle` 은 응답을 마친 세션과 한 번도 일한 적 없는 세션이 같은 값이므로,
 tmux-agent-status 는 `busy` 나 `waiting` 을 한 번이라도 거친 세션만 `idle` 로
 표시한다.
 
 ## 표시 위치
 
-창 탭에는 그 창에 속한 pane 을 상태별로 센 개수가 나온다. 순서는 고정이고,
-사용자가 먼저 봐야 하는 상태가 왼쪽에 온다.
+window indicator 에는 그 창에 속한 pane 을 상태별로 센 marker 와 counter 가
+나온다. 순서는 고정이고, 사용자가 먼저 봐야 하는 상태가 왼쪽에 온다.
 
 ```
- 2  ●1 ●2  claude
+ 2  ● 1 ● 2  claude
 ```
 
-pane 제목에는 그 pane 하나의 상태가 나온다. `busy` 이면 그 상태로 있은 시간이
-뒤에 붙는다.
+pane indicator 에는 그 pane 하나의 marker 가 나온다. `busy` 이면 그 상태로 있은
+시간을 나타내는 clock 이 뒤에 붙는다.
 
 ```
- 1  ●49s  Jupiter tmux 커스텀
+ 1  ● 49s  Jupiter tmux 커스텀
 ```
 
 ## 설치
@@ -51,12 +51,12 @@ tmux.conf 에 진입점을 부르는 한 줄을 넣는다. 진입점은 옵션�
 run-shell "~/tmux-agent-status/tmux/agent-status.tmux"
 ```
 
-진입점은 배지 문자열을 옵션에 넣어 둘 뿐 상태바 포맷을 대신 고치지 않는다.
-배지는 쓰던 포맷에 직접 끼워 넣는다.
+진입점은 indicator 문자열을 옵션에 넣어 둘 뿐 상태바 포맷을 대신 고치지 않는다.
+indicator 는 쓰던 포맷에 직접 끼워 넣는다.
 
 ```tmux
-set -g window-status-format "#I #{E:@agent_win_badge}#W"
-set -wg pane-border-format  "#{pane_index} #{E:@agent_badge_pane}#{pane_title}"
+set -g window-status-format "#I #{E:@agent_window_indicator}#W"
+set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
 ```
 
 ## pi 연동
@@ -75,16 +75,22 @@ tmux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 �
 
 ## 옵션
 
-색과 글리프는 티커가 시작할 때 한 번 읽는다. 값을 바꾼 뒤에는 tmux 설정을
-다시 읽어야 반영된다.
+색과 marker 는 티커가 시작할 때 한 번 읽는다. 값을 바꾼 뒤에는 tmux 설정을
+다시 읽어야 반영된다. tmux.conf 에서 진입점보다 먼저 정한 값이 우선한다.
+진입점이 기본값을 `set -ogq` 로 넣기 때문이다.
 
 | 옵션 | 기본값 | 뜻 |
 | --- | --- | --- |
 | `@agent_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | `waiting` 의 색 |
 | `@agent_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | `idle` 의 색 |
 | `@agent_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | `busy` 의 색 |
-| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | 배지 뒤에 오는 글자의 색 |
-| `@agent_glyph` | `●` | 세 상태가 함께 쓰는 글리프 |
+| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | indicator 뒤에 오는 글자의 색 |
+| `@agent_marker` | `●` | 세 상태의 기본 marker |
+| `@agent_marker_waiting` | `@agent_marker` | `waiting` 의 marker |
+| `@agent_marker_idle` | `@agent_marker` | `idle` 의 marker |
+| `@agent_marker_busy` | `@agent_marker` | `busy` 의 marker |
+| `@agent_counter_color` | 비움 | counter 의 색. 비우면 marker 색을 따른다 |
+| `@agent_clock_color` | 비움 | clock 의 색. 비우면 marker 색을 따른다 |
 
 ## 동작 원리
 
@@ -115,7 +121,7 @@ Claude Code 가 상태를 하나만 주므로 이 구분을 만들 방법이 없
 
 **세션 파일의 경로는 공개된 인터페이스가 아니다.** `~/.claude/sessions` 는
 Claude Code 의 내부 구조이고 버전이 올라가면 바뀔 수 있다. 파일을 못 읽게 되면
-Claude 세션의 배지만 사라지고 pi 세션과 tmux 는 그대로 동작한다. 같은 값을
+Claude 세션의 indicator 만 사라지고 pi 세션과 tmux 는 그대로 동작한다. 같은 값을
 `claude agents --json` 이 공개 인터페이스로 내보내므로, 그때는 티커가 그 명령을
 쓰도록 바꾸면 된다. 이 명령은 호출당 400밀리초가 들어서 폴링 주기를 함께
 늘려야 한다.

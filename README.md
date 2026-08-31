@@ -19,24 +19,25 @@ The default palette is catppuccin mocha.
 | `busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | The session is running. Elapsed time is shown alongside |
 
 A session that has just been started and has not done any work yet carries no
-badge. `idle` is the same value for a session that finished responding and for
+indicator. `idle` is the same value for a session that finished responding and for
 one that never worked, so tmux-agent-status only reports `idle` for sessions it
 has seen in `busy` or `waiting` at least once.
 
 ## Placement
 
-The window tab carries a count per state for the panes in that window. The
-order is fixed, and the state that most needs your attention comes first.
+The window indicator carries one marker and counter per state for the panes in
+that window. The order is fixed, and the state that most needs your attention
+comes first.
 
 ```
- 2  ●1 ●2  claude
+ 2  ● 1 ● 2  claude
 ```
 
-The pane title carries the state of that one pane. For `busy` it is followed by
-how long the pane has been in that state.
+The pane indicator carries the marker for that one pane. For `busy` a clock
+follows, showing how long the pane has been in that state.
 
 ```
- 1  ●49s  Jupiter tmux setup
+ 1  ● 49s  Jupiter tmux setup
 ```
 
 ## Installation
@@ -52,12 +53,13 @@ the option defaults and starts the ticker.
 run-shell "~/tmux-agent-status/tmux/agent-status.tmux"
 ```
 
-The entry point only writes the badge strings into options. It does not rewrite
-your status bar format. Splice the badges into the format you already use.
+The entry point only writes the indicator strings into options. It does not
+rewrite your status bar format. Splice the indicators into the format you
+already use.
 
 ```tmux
-set -g window-status-format "#I #{E:@agent_win_badge}#W"
-set -wg pane-border-format  "#{pane_index} #{E:@agent_badge_pane}#{pane_title}"
+set -g window-status-format "#I #{E:@agent_window_indicator}#W"
+set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
 ```
 
 ## pi support
@@ -77,16 +79,23 @@ of tmux-agent-status, so nothing is translated in between.
 
 ## Options
 
-The ticker reads the colors and the glyph once at startup. Changing them takes
-effect after the tmux configuration is sourced again.
+The ticker reads the colors and the markers once at startup. Changing them
+takes effect after the tmux configuration is sourced again. Values set in
+tmux.conf before the entry point runs win, because the entry point writes its
+defaults with `set -ogq`.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `@agent_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | Color for `waiting` |
 | `@agent_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | Color for `idle` |
 | `@agent_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | Color for `busy` |
-| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | Color of the text that follows a badge |
-| `@agent_glyph` | `●` | Glyph shared by all three states |
+| `@agent_color_text` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | Color of the text that follows an indicator |
+| `@agent_marker` | `●` | Default marker for all three states |
+| `@agent_marker_waiting` | `@agent_marker` | Marker for `waiting` |
+| `@agent_marker_idle` | `@agent_marker` | Marker for `idle` |
+| `@agent_marker_busy` | `@agent_marker` | Marker for `busy` |
+| `@agent_counter_color` | empty | Color of the counter. Empty follows the marker |
+| `@agent_clock_color` | empty | Color of the clock. Empty follows the marker |
 
 ## How it works
 
@@ -119,7 +128,7 @@ so this distinction cannot be recovered.
 
 **The session file path is not a public interface.** `~/.claude/sessions` is
 internal to Claude Code and may move between versions. If the files become
-unreadable, only the badges for Claude sessions disappear; pi sessions and tmux
+unreadable, only the indicators for Claude sessions disappear; pi sessions and tmux
 keep working. The same values are published through `claude agents --json`, so
 the ticker can be pointed at that command instead. That call costs about 400
 milliseconds, so the polling interval has to grow with it.

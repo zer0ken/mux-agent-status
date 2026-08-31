@@ -12,9 +12,9 @@
 #   busy     돌고 있다
 #
 # 내보내는 것
-#   @agent_pane_state  pane 하나의 상태 (pane 옵션)
-#   @agent_elapsed     busy 로 있은 시간 (pane 옵션)
-#   @agent_win_badge   창 안 상태별 개수를 그린 문자열 (창 옵션)
+#   @agent_pane_state        pane 하나의 상태 (pane 옵션)
+#   @agent_clock             busy 로 있은 시간 (pane 옵션)
+#   @agent_window_indicator  marker 와 counter 를 늘어놓은 문자열 (창 옵션)
 set -uo pipefail
 
 INTERVAL=1
@@ -23,19 +23,17 @@ STARTUP_TRIES=30
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
 STATE_DIR="${TMPDIR:-/tmp}/tmux-agent-status-$(id -u)"
 
-# 창 요약에 나오는 순서. 사용자가 먼저 봐야 하는 것이 왼쪽이다.
-# 표식과 개수는 붙여 쓰고 항목 사이만 띄운다. 개수가 어느 표식의
-# 것인지 한눈에 묶이게 한다.
+# window indicator 에 나오는 순서. 사용자가 먼저 봐야 하는 것이 왼쪽이다.
 ORDER=(waiting idle busy)
 
-# 색과 글리프는 tmux 옵션으로 바꾼다. 기본값은 claude-session-manager 와 같은
-# 뜻이고 catppuccin mocha 팔레트를 쓴다. 시작할 때 한 번만 읽는다.
-declare -A COLOR
-_v=$(tmux display-message -p '#{@agent_color_waiting}|#{@agent_color_idle}|#{@agent_color_busy}|#{@agent_color_text}|#{@agent_glyph}' 2>/dev/null)
-IFS='|' read -r c_wait c_idle c_busy c_text glyph <<< "$_v"
-COLOR=( [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
+# marker 의 색과 글리프는 상태마다 따로 정한다. counter 는 색을 비워 두면
+# 자기 marker 의 색을 따른다. 시작할 때 한 번만 읽는다.
+declare -A COLOR MARKER
+_v=$(tmux display-message -p '#{@agent_color_waiting}|#{@agent_color_idle}|#{@agent_color_busy}|#{@agent_color_text}|#{@agent_marker_waiting}|#{@agent_marker_idle}|#{@agent_marker_busy}|#{@agent_counter_color}' 2>/dev/null)
+IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_FG <<< "$_v"
+COLOR=(  [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
+MARKER=( [waiting]="${m_wait:-●}"       [idle]="${m_idle:-●}"       [busy]="${m_busy:-●}" )
 TEXT_FG="${c_text:-#cdd6f4}"
-GLYPH="${glyph:-●}"
 
 ready=""
 for _ in $(seq "$STARTUP_TRIES"); do
@@ -51,9 +49,9 @@ server_id=${TMUX%,*}; server_id=${server_id##*,}
 exec 9>"${TMPDIR:-/tmp}/agent-status-$(id -u)-${server_id}.lock" || exit 0
 flock -n 9 || exit 0    # 이미 돌고 있으면 조용히 끝낸다
 
-# 세션이 한 번도 일한 적 없으면 배지를 달지 않는다. 띄워만 두고 아무 작업도
+# 세션이 한 번도 일한 적 없으면 indicator 를 달지 않는다. 띄워만 두고 아무 작업도
 # 하지 않은 세션과 방금 응답을 마친 세션이 둘 다 idle 이기 때문이다.
-declare -A worked=() prev_win=() since=()
+declare -A worked=() prev_ind=() since=()
 shopt -s nullglob
 
 while :; do
@@ -85,7 +83,7 @@ while :; do
     case "$pst" in idle|busy|waiting) state[$pane]=$pst ;; esac
   done
 
-  rows=$(tmux list-panes -a -F '#{pane_id}|#{window_id}|#{@agent_pane_state}|#{@agent_elapsed}' 2>/dev/null) || exit 0
+  rows=$(tmux list-panes -a -F '#{pane_id}|#{window_id}|#{@agent_pane_state}|#{@agent_clock}' 2>/dev/null) || exit 0
 
   declare -A count=() seen=()
   changed=""
@@ -116,8 +114,8 @@ while :; do
       changed=1
     }
     [ "$el" != "$cur_el" ] && {
-      if [ -n "$el" ]; then tmux set-option -p -t "$pane" @agent_elapsed "$el" 2>/dev/null
-      else tmux set-option -p -t "$pane" -u @agent_elapsed 2>/dev/null; fi
+      if [ -n "$el" ]; then tmux set-option -p -t "$pane" @agent_clock "$el" 2>/dev/null
+      else tmux set-option -p -t "$pane" -u @agent_clock 2>/dev/null; fi
       changed=1
     }
 
@@ -125,17 +123,21 @@ while :; do
   done <<< "$rows"
 
   for wid in "${!seen[@]}"; do
-    badge=""
+    ind=""
     for s in "${ORDER[@]}"; do
       n=${count[$wid/$s]:-0}
       [ "$n" -gt 0 ] || continue
-      badge+="#[fg=${COLOR[$s]}]$GLYPH$n "
+      if [ -n "${COUNTER_FG:-}" ]; then
+      ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} #[fg=$COUNTER_FG]$n "
+    else
+      ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} $n "
+    fi
     done
-    [ -n "$badge" ] && badge+="#[fg=$TEXT_FG]"
-    [ "$badge" = "${prev_win[$wid]:-}" ] && continue
-    if [ -n "$badge" ]; then tmux set-option -w -t "$wid" @agent_win_badge "$badge" 2>/dev/null
-    else tmux set-option -w -t "$wid" -u @agent_win_badge 2>/dev/null; fi
-    prev_win[$wid]=$badge
+    [ -n "$ind" ] && ind+="#[fg=$TEXT_FG]"
+    [ "$ind" = "${prev_ind[$wid]:-}" ] && continue
+    if [ -n "$ind" ]; then tmux set-option -w -t "$wid" @agent_window_indicator "$ind" 2>/dev/null
+    else tmux set-option -w -t "$wid" -u @agent_window_indicator 2>/dev/null; fi
+    prev_ind[$wid]=$ind
     changed=1
   done
 
