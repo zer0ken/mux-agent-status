@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-tmux-agent-status 는 tmux 상태바에 Claude Code 와 pi 세션의 상태를 표시한다.
+tmux-agent-status 는 tmux 상태바에 Claude Code, codex, pi 세션의 상태를 표시한다.
 창을 여러 개 열어 두었을 때 어느 창이 입력을 기다리는지, 어느 창이 아직 돌고
 있는지를 창을 옮기지 않고 알 수 있다.
 
@@ -83,6 +83,37 @@ pi install git:github.com/zer0ken/tmux-agent-status
 `<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. 상태 이름은
 tmux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
 
+## codex 연동
+
+codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없다. 세션을 pane 에 이을
+값이 없어서, 이 저장소가 상태를 기록하는 훅 스크립트를 함께 담고 있다. codex 는 훅을
+부를 때 자기 환경을 물려주므로, 스크립트는 `TMUX_PANE` 으로 pane 을 안다.
+
+`~/.codex/hooks.json` 에 훅 세 개를 넣는다.
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh busy" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh idle" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh remove" } ] }
+    ]
+  }
+}
+```
+
+codex 는 신뢰하지 않은 훅을 돌리지 않는다. 훅을 넣은 뒤 codex 를 처음 띄우면
+codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승인해야 훅이 돈다.
+
+훅은 `$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` 에 `<상태> <pid>` 를 쓰고,
+세션이 끝나면 그 파일을 지운다. 상태 이름은 tmux-agent-status 의 나머지와 같아서
+중간에 옮겨 적는 과정이 없다.
+
 ## 옵션
 
 옵션은 값을 바꾸면 1초 안에 반영된다. tmux.conf 에서 진입점보다 먼저 정한 값이
@@ -103,12 +134,14 @@ tmux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 �
 
 ## 동작 원리
 
-상태는 에이전트가 스스로 기록한 것을 읽는다. tmux-agent-status 는 Claude Code
-훅을 걸지 않고 프로세스 목록을 뒤지지도 않는다.
+상태는 에이전트가 스스로 기록한 것을 읽는다. Claude Code 는 세션 파일을 직접
+쓰고, codex 와 pi 는 이 저장소가 담은 훅과 확장이 대신 쓴다. tmux-agent-status 는
+어느 쪽에서도 프로세스 목록을 뒤지지 않는다.
 
 | 에이전트 | 상태 파일 |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
+| codex | `$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` |
 | pi | `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` |
 
 Claude Code 의 세션 파일에는 그 세션이 붙어 있는 pane 의 id 가 `tmux` 필드로
@@ -133,16 +166,21 @@ Claude Code 가 상태를 하나만 주므로 이 구분을 만들 방법이 없
 
 **세션 파일의 경로는 공개된 인터페이스가 아니다.** `~/.claude/sessions` 는
 Claude Code 의 내부 구조이고 버전이 올라가면 바뀔 수 있다. 파일을 못 읽게 되면
-Claude 세션의 indicator 만 사라지고 pi 세션과 tmux 는 그대로 동작한다. 같은 값을
+Claude 세션의 indicator 만 사라지고 codex 와 pi 세션은 그대로 동작한다. 같은 값을
 `claude agents --json` 이 공개 인터페이스로 내보내므로, 티커가 그 명령을 쓰도록
 고치면 다시 동작한다. 이 명령은 호출당 400밀리초가 들어서 폴링 주기를 함께
 늘려야 한다.
+
+**codex 의 승인 대기는 `busy` 로 나온다.** codex 가 명령 실행 승인을 물어도 턴은
+끝나지 않아서 `Stop` 훅이 돌지 않는다. 사용자가 답해야 하는 동안 pane 은 `busy` 의
+빨간 점으로 남는다. 걸어 둔 훅 세 개로는 승인 프롬프트가 떠 있다는 것을 알 수 없다.
 
 ## 요구 사항
 
 - tmux 3.2 이상
 - bash 5.0 이상
 - Claude Code 2.1 이상
+- codex 0.152 이상
 
 ## 라이선스
 

@@ -2,9 +2,9 @@
 # agent-status.sh - 에이전트 상태를 tmux 옵션으로 밀어 넣는 티커.
 #
 # 상태는 에이전트가 스스로 쓴 것을 읽는다. Claude Code 는 세션마다
-# ~/.claude/sessions/<pid>.json 을 갱신하고, pi 는 이 저장소의 확장이
-# $TMPDIR/tmux-agent-status-<uid>/pi-<pane> 을 갱신한다. 훅도 프로세스 탐색도
-# 필요 없다.
+# ~/.claude/sessions/<pid>.json 을 갱신하고, pi 와 codex 는 이 저장소가 담은
+# 확장과 훅이 $TMPDIR/tmux-agent-status-<uid>/<에이전트>-<pane> 을 갱신한다.
+# 프로세스 탐색은 필요 없다.
 #
 # 어휘는 claude-session-manager 와 같다.
 #   waiting  입력이 필요하다
@@ -77,9 +77,10 @@ while :; do
     fi
   done
 
-  # ── pi 상태 파일. 프로세스가 죽었으면 파일을 치운다 ────────
-  for f in "$STATE_DIR"/pi-*; do
-    pane="%${f##*/pi-}"
+  # ── 확장과 훅이 쓴 상태 파일. 프로세스가 죽었으면 파일을 치운다 ──
+  for f in "$STATE_DIR"/pi-* "$STATE_DIR"/codex-*; do
+    base=${f##*/}
+    pane="%${base#*-}"
     read -r pst pid 2>/dev/null < "$f" || continue
     if [ -n "${pid:-}" ] && [ "$pid" != 0 ] && ! kill -0 "$pid" 2>/dev/null; then
       rm -f "$f" 2>/dev/null; continue

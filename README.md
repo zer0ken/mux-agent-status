@@ -2,7 +2,7 @@
 
 [한국어](README.ko.md)
 
-tmux-agent-status shows the state of your Claude Code and pi sessions in the
+tmux-agent-status shows the state of your Claude Code, codex and pi sessions in the
 tmux status bar. With several windows open, you can see which one is waiting on
 you and which one is still running without switching to it.
 
@@ -87,6 +87,40 @@ The extension writes `<state> <pid>` to
 the file when the session ends. It uses the same three state names as the rest
 of tmux-agent-status, so nothing is translated in between.
 
+## codex support
+
+codex writes a record file per session, but that file carries no pane. Nothing
+in it ties a session to a pane, so this repository ships a hook script that
+records the state instead. codex passes its own environment to a hook, so the
+script reads the pane from `TMUX_PANE`.
+
+Put three hooks in `~/.codex/hooks.json`.
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh busy" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh idle" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh remove" } ] }
+    ]
+  }
+}
+```
+
+codex runs no hook it does not trust. On the first codex launch after the hooks
+are in place, codex shows a review screen. The hooks run once the user approves
+them there.
+
+The hook writes `<state> <pid>` to
+`$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` and removes the file when the
+session ends. It uses the same state names as the rest of tmux-agent-status, so
+nothing is translated in between.
+
 ## Options
 
 An option takes effect within a second of being changed. Values set in
@@ -108,12 +142,15 @@ defaults with `set -ogq`.
 
 ## How it works
 
-The state comes from what each agent records about itself. tmux-agent-status
-installs no Claude Code hooks and scans no process table.
+The state comes from what each agent records about itself. Claude Code writes
+its session file on its own; for codex and pi the hook and the extension this
+repository ships write it instead. tmux-agent-status scans a process table on
+neither path.
 
 | Agent | State file |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
+| codex | `$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` |
 | pi | `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` |
 
 The Claude Code session file carries the id of the pane the session runs in, in
@@ -139,16 +176,22 @@ so this distinction cannot be recovered.
 
 **The session file path is not a public interface.** `~/.claude/sessions` is
 internal to Claude Code and may move between versions. If the files become
-unreadable, only the indicators for Claude sessions disappear; pi sessions and
-tmux keep working. The same values are published through `claude agents --json`,
+unreadable, only the indicators for Claude sessions disappear; codex and pi
+sessions keep working. The same values are published through `claude agents --json`,
 so pointing the ticker at that command brings them back. That call costs about
 400 milliseconds, so the polling interval has to grow with it.
+
+**An approval prompt in codex reads as `busy`.** When codex asks to run a
+command the turn has not ended, so the `Stop` hook does not fire. The pane stays
+on the red `busy` dot for as long as it is the user's move. The three hooks
+above cannot tell that an approval prompt is on screen.
 
 ## Requirements
 
 - tmux 3.2 or newer
 - bash 5.0 or newer
 - Claude Code 2.1 or newer
+- codex 0.152 or newer
 
 ## License
 
