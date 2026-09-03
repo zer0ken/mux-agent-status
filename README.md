@@ -1,8 +1,8 @@
-# tmux-agent-status
+# mux-agent-status
 
 [한국어](README.ko.md)
 
-tmux-agent-status shows the state of your Claude Code, codex and pi sessions in the
+mux-agent-status shows the state of your Claude Code, codex and pi sessions in the
 tmux status bar. With several windows open, you can see which one is waiting on
 you and which one is still running without switching to it.
 
@@ -20,12 +20,12 @@ The default palette is catppuccin mocha.
 
 A session that has just been started and has not done any work yet stays off the
 status bar. Claude Code reports `idle` for such a session and for one that
-finished responding alike, so tmux-agent-status only shows `idle` for sessions
+finished responding alike, so mux-agent-status only shows `idle` for sessions
 it has seen in `busy` or `waiting` at least once.
 
 ## Indicators
 
-tmux-agent-status publishes two indicators. The window indicator stands for one
+mux-agent-status publishes two indicators. The window indicator stands for one
 window, the pane indicator for one pane. The parts an indicator is built from
 each have a name.
 
@@ -53,7 +53,7 @@ follows the marker.
 ## Installation
 
 ```bash
-git clone https://github.com/zer0ken/tmux-agent-status.git ~/tmux-agent-status
+git clone https://github.com/zer0ken/mux-agent-status.git ~/mux-agent-status
 ```
 
 Add one line to tmux.conf that calls the entry point. The entry point fills in
@@ -61,7 +61,7 @@ the option defaults and starts the ticker, a background process that reads the
 state and carries it into tmux options.
 
 ```tmux
-run-shell "~/tmux-agent-status/tmux/agent-status.tmux"
+run-shell "~/mux-agent-status/mux/tmux/agent-status.tmux"
 ```
 
 The entry point only writes the indicators into options. It does not rewrite
@@ -79,13 +79,13 @@ repository ships a pi extension that records the state itself. Install the
 extension with pi; no other package is needed.
 
 ```bash
-pi install git:github.com/zer0ken/tmux-agent-status
+pi install git:github.com/zer0ken/mux-agent-status
 ```
 
 The extension writes `<state> <pid>` to
-`$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` on every state change and removes
+`$TMPDIR/mux-agent-status-<uid>/pi-<pane>` on every state change and removes
 the file when the session ends. It uses the same three state names as the rest
-of tmux-agent-status, so nothing is translated in between.
+of mux-agent-status, so nothing is translated in between.
 
 ## codex support
 
@@ -100,13 +100,13 @@ Put three hooks in `~/.codex/hooks.json`.
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh busy" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh idle" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh remove" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
     ]
   }
 }
@@ -117,8 +117,8 @@ are in place, codex shows a review screen. The hooks run once the user approves
 them there.
 
 The hook writes `<state> <pid>` to
-`$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` and removes the file when the
-session ends. It uses the same state names as the rest of tmux-agent-status, so
+`$TMPDIR/mux-agent-status-<uid>/codex-<pane>` and removes the file when the
+session ends. It uses the same state names as the rest of mux-agent-status, so
 nothing is translated in between.
 
 ## Options
@@ -144,21 +144,20 @@ defaults with `set -ogq`.
 
 The state comes from what each agent records about itself. Claude Code writes
 its session file on its own; for codex and pi the hook and the extension this
-repository ships write it instead. tmux-agent-status scans a process table on
+repository ships write it instead. mux-agent-status scans a process table on
 neither path.
 
 | Agent | State file |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` |
-| pi | `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status-<uid>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status-<uid>/pi-<pane>` |
 
-The Claude Code session file carries the id of the pane the session runs in, in
-its `tmux` field, so there is no need to map a pid to a tty and a tty to a pane.
-The file is single-line JSON, which bash reads with a regular expression, and
-that path spawns no processes at all.
+How each agent records its state lives under `agents/<agent>/`. The principle
+behind reading the Claude Code state file is in
+[agents/claude](agents/claude/README.md).
 
-`bin/agent-status.sh` is the ticker. It runs once a second and covers the two
+`mux/tmux/agent-status.sh` is the ticker. It runs once a second and covers the two
 things a tmux format cannot do on its own.
 
 - Carrying the state files into pane options
@@ -166,6 +165,23 @@ things a tmux format cannot do on its own.
 
 The ticker writes options only for the panes and windows whose values changed.
 One ticker runs per tmux server and ends when that server ends.
+
+## Layout
+
+The directories split code that knows a mux from code that knows an agent.
+Adding a mux or an agent then touches one place.
+
+| Directory | Holds |
+| --- | --- |
+| `mux/tmux` | The entry point and the ticker, which carry state files into tmux options |
+| `agents/claude` | A document on the principle behind reading the Claude Code state file |
+| `agents/codex` | The script the codex hooks call |
+| `agents/pi` | The pi extension |
+
+An agent leaves its state in
+`$TMPDIR/mux-agent-status-<uid>/<agent>-<pane>` and a mux reads only that
+directory. That path and the three state names are the whole contract between
+the two sides.
 
 ## Limitations
 

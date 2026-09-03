@@ -1,11 +1,11 @@
 {
-  "name": "tmux-agent-status",
+  "name": "mux-agent-status",
   "version": "1.1.0",
   "description": "Show Claude Code, codex and pi session state in the tmux status bar",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zer0ken/tmux-agent-status.git"
+    "url": "git+https://github.com/zer0ken/mux-agent-status.git"
   },
   "keywords": [
     "pi-package",
@@ -17,7 +17,7 @@
   ],
   "pi": {
     "extensions": [
-      "./pi/index.ts"
+      "./agents/pi/index.ts"
     ]
   }
 }

@@ -3,7 +3,7 @@
 #
 # 상태는 에이전트가 스스로 쓴 것을 읽는다. Claude Code 는 세션마다
 # ~/.claude/sessions/<pid>.json 을 갱신하고, pi 와 codex 는 이 저장소가 담은
-# 확장과 훅이 $TMPDIR/tmux-agent-status-<uid>/<에이전트>-<pane> 을 갱신한다.
+# 확장과 훅이 $TMPDIR/mux-agent-status-<uid>/<에이전트>-<pane> 을 갱신한다.
 # 프로세스 탐색은 필요 없다.
 #
 # 어휘는 claude-session-manager 와 같다.
@@ -21,7 +21,7 @@ INTERVAL=1
 STARTUP_TRIES=30
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
-STATE_DIR="${TMPDIR:-/tmp}/tmux-agent-status-$(id -u)"
+STATE_DIR="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)"
 
 # window indicator 에 나오는 순서. 사용자가 먼저 봐야 하는 것이 왼쪽이다.
 ORDER=(waiting idle busy)

@@ -1,8 +1,8 @@
-# tmux-agent-status
+# mux-agent-status
 
 [English](README.md)
 
-tmux-agent-status 는 tmux 상태바에 Claude Code, codex, pi 세션의 상태를 표시한다.
+mux-agent-status 는 tmux 상태바에 Claude Code, codex, pi 세션의 상태를 표시한다.
 창을 여러 개 열어 두었을 때 어느 창이 입력을 기다리는지, 어느 창이 아직 돌고
 있는지를 창을 옮기지 않고 알 수 있다.
 
@@ -18,12 +18,12 @@ tmux-agent-status 는 tmux 상태바에 Claude Code, codex, pi 세션의 상태�
 | `busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | 세션이 돌고 있다 |
 
 방금 띄워 아직 아무 작업도 하지 않은 세션은 상태바에 나오지 않는다. Claude Code
-가 그런 세션과 응답을 마친 세션에 똑같이 `idle` 을 주므로, tmux-agent-status 는
+가 그런 세션과 응답을 마친 세션에 똑같이 `idle` 을 주므로, mux-agent-status 는
 `busy` 나 `waiting` 을 한 번이라도 거친 세션만 `idle` 로 표시한다.
 
 ## indicator 구성
 
-tmux-agent-status 가 내보내는 indicator 는 두 가지다. window indicator 는 창
+mux-agent-status 가 내보내는 indicator 는 두 가지다. window indicator 는 창
 하나를, pane indicator 는 pane 하나를 나타낸다. indicator 를 이루는 부분에는
 각각 이름이 있다.
 
@@ -51,14 +51,14 @@ pane indicator 는 그 pane 하나의 marker 를 보여준다. 상태가 `busy` 
 ## 설치
 
 ```bash
-git clone https://github.com/zer0ken/tmux-agent-status.git ~/tmux-agent-status
+git clone https://github.com/zer0ken/mux-agent-status.git ~/mux-agent-status
 ```
 
 tmux.conf 에 진입점을 부르는 한 줄을 넣는다. 진입점은 옵션의 기본값을 채우고
 티커를 띄운다. 티커는 상태를 읽어 tmux 옵션으로 옮기는 백그라운드 프로세스다.
 
 ```tmux
-run-shell "~/tmux-agent-status/tmux/agent-status.tmux"
+run-shell "~/mux-agent-status/mux/tmux/agent-status.tmux"
 ```
 
 진입점은 indicator 를 옵션에 넣어 둘 뿐 상태바 포맷을 대신 고치지 않는다.
@@ -76,12 +76,12 @@ pi 는 실행 중인 세션의 목록도 상태 파일도 내보내지 않는다
 필요 없다.
 
 ```bash
-pi install git:github.com/zer0ken/tmux-agent-status
+pi install git:github.com/zer0ken/mux-agent-status
 ```
 
-확장은 상태가 바뀔 때마다 `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` 에
+확장은 상태가 바뀔 때마다 `$TMPDIR/mux-agent-status-<uid>/pi-<pane>` 에
 `<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. 상태 이름은
-tmux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
+mux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
 
 ## codex 연동
 
@@ -95,13 +95,13 @@ codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없�
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh busy" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh idle" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "~/tmux-agent-status/codex/agent-status.sh remove" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
     ]
   }
 }
@@ -110,8 +110,8 @@ codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없�
 codex 는 신뢰하지 않은 훅을 돌리지 않는다. 훅을 넣은 뒤 codex 를 처음 띄우면
 codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승인해야 훅이 돈다.
 
-훅은 `$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` 에 `<상태> <pid>` 를 쓰고,
-세션이 끝나면 그 파일을 지운다. 상태 이름은 tmux-agent-status 의 나머지와 같아서
+훅은 `$TMPDIR/mux-agent-status-<uid>/codex-<pane>` 에 `<상태> <pid>` 를 쓰고,
+세션이 끝나면 그 파일을 지운다. 상태 이름은 mux-agent-status 의 나머지와 같아서
 중간에 옮겨 적는 과정이 없다.
 
 ## 옵션
@@ -135,21 +135,20 @@ codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승
 ## 동작 원리
 
 상태는 에이전트가 스스로 기록한 것을 읽는다. Claude Code 는 세션 파일을 직접
-쓰고, codex 와 pi 는 이 저장소가 담은 훅과 확장이 대신 쓴다. tmux-agent-status 는
+쓰고, codex 와 pi 는 이 저장소가 담은 훅과 확장이 대신 쓴다. mux-agent-status 는
 어느 쪽에서도 프로세스 목록을 뒤지지 않는다.
 
 | 에이전트 | 상태 파일 |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/tmux-agent-status-<uid>/codex-<pane>` |
-| pi | `$TMPDIR/tmux-agent-status-<uid>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status-<uid>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status-<uid>/pi-<pane>` |
 
-Claude Code 의 세션 파일에는 그 세션이 붙어 있는 pane 의 id 가 `tmux` 필드로
-들어 있어서, pid 를 tty 로 옮기고 다시 pane 으로 옮기는 과정이 필요 없다.
-파일이 한 줄짜리 JSON 이라 bash 정규식만으로 읽히고, 이 과정에서 프로세스가
-하나도 뜨지 않는다.
+에이전트마다 상태를 어떻게 남기는지는 `agents/<에이전트>/` 가 담고 있다.
+Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/README.ko.md)
+에 있다.
 
-`bin/agent-status.sh` 가 티커다. 1초마다 돌면서 tmux 포맷만으로는 할 수 없는 두
+`mux/tmux/agent-status.sh` 가 티커다. 1초마다 돌면서 tmux 포맷만으로는 할 수 없는 두
 가지를 맡는다.
 
 - 상태 파일을 읽어 pane 옵션으로 옮긴다
@@ -157,6 +156,21 @@ Claude Code 의 세션 파일에는 그 세션이 붙어 있는 pane 의 id 가 
 
 티커는 값이 바뀐 pane 과 창에만 옵션을 쓴다. tmux 서버마다 하나만 돌고 서버가
 끝나면 함께 끝난다.
+
+## 저장소 구조
+
+디렉터리는 mux 를 아는 코드와 에이전트를 아는 코드로 나뉜다. 새 mux 나 새
+에이전트를 더할 때 고쳐야 할 자리가 한 곳으로 모인다.
+
+| 디렉터리 | 담고 있는 것 |
+| --- | --- |
+| `mux/tmux` | 진입점과 티커. 상태 파일을 읽어 tmux 옵션으로 옮긴다 |
+| `agents/claude` | Claude Code 의 상태 파일을 읽는 원리를 적은 문서 |
+| `agents/codex` | codex 훅이 부르는 스크립트 |
+| `agents/pi` | pi 확장 |
+
+에이전트는 상태를 `$TMPDIR/mux-agent-status-<uid>/<에이전트>-<pane>` 에 남기고,
+mux 는 그 디렉터리만 읽는다. 두 쪽은 이 경로와 세 상태 이름으로만 이어져 있다.
 
 ## 제약
 

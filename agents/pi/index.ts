@@ -1,11 +1,11 @@
 /**
- * pi 세션의 상태를 파일 하나에 쓴다. tmux-agent-status 티커가 그 파일을 읽어
+ * pi 세션의 상태를 파일 하나에 쓴다. mux-agent-status 의 티커가 그 파일을 읽어
  * tmux 상태바에 표시한다.
  *
  * pi 는 실행 중인 세션의 목록도, 상태 파일도 내보내지 않는다. Claude Code 의
  * ~/.claude/sessions/<pid>.json 에 해당하는 것이 없어서 이 확장이 대신 쓴다.
  *
- * 파일: $TMPDIR/tmux-agent-status-<uid>/pi-<pane>
+ * 파일: $TMPDIR/mux-agent-status-<uid>/pi-<pane>
  * 내용: "<상태> <pid>"
  *
  * 상태는 티커가 쓰는 어휘를 그대로 쓴다.
@@ -27,7 +27,7 @@ export default function (pi: ExtensionAPI) {
   if (!pane) return;   // tmux 밖에서는 표시할 곳이 없다
 
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
-  const dir = `${process.env.TMPDIR ?? tmpdir()}/tmux-agent-status-${uid}`;
+  const dir = `${process.env.TMPDIR ?? tmpdir()}/mux-agent-status-${uid}`;
   const file = `${dir}/pi-${pane.replace("%", "")}`;
 
   let state: State = "idle";

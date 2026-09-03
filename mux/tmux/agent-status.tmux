@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# tmux-agent-status 진입점. tmux.conf 에서 이 파일을 부른다.
+# mux-agent-status 의 tmux 진입점. tmux.conf 에서 이 파일을 부른다.
 #
-#   run-shell "~/tmux-agent-status/tmux/agent-status.tmux"
+#   run-shell "~/mux-agent-status/mux/tmux/agent-status.tmux"
 #
 # 기본값은 set -ogq 로 넣는다. -o 는 이미 정해진 옵션을 건드리지 않으므로
 # tmux.conf 에서 미리 정한 값이 우선한다.
@@ -47,5 +47,5 @@ tmux set -ogq @agent_pane_indicator "$ind"
 # 티커는 tmux 의 감시 밖에서 띄운다. run-shell 로 띄우면 tmux 가 그 프로세스를
 # 계속 지켜보다가 종료 시그널을 받고 죽을 때 오류 창을 띄운다. 티커는 서버가
 # 살아 있는 내내 도는 프로세스라 언젠가는 반드시 그렇게 끝난다.
-setsid "$DIR/../bin/agent-status.sh" </dev/null >/dev/null 2>&1 &
+setsid "$DIR/agent-status.sh" </dev/null >/dev/null 2>&1 &
 disown 2>/dev/null || true
