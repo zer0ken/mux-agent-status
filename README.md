@@ -132,21 +132,27 @@ Put three hooks in `~/.codex/hooks.json`.
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
+      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
+      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
+      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
     ]
   }
 }
 ```
 
+The command names `bash` rather than the script alone. codex spawns a hook
+command as a process rather than through a shell, and on Windows a path ending
+in `.sh` is not something the system can execute, so the hook would be reported
+as completed while never running. codex expands the leading `~` itself, so the
+same line works on every OS.
+
 codex runs no hook it does not trust. On the first codex launch after the hooks
 are in place, codex shows a review screen. The hooks run once the user approves
-them there.
+them there. Editing `hooks.json` asks for that approval again.
 
 The hook writes `<state> <pid>` to
 `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/codex-<pane>` and removes the
@@ -264,7 +270,8 @@ one per machine.
 
 A state file whose agent crashed without removing it is dropped by the ticker,
 which reads the pid the file carries and checks whether that process is still
-running. On Windows this takes two steps: `kill -0` recognizes only the pids
+running. A pid of `0` means the writer could not identify its own process, and
+the ticker then keeps the file until the agent removes it. On Windows this takes two steps: `kill -0` recognizes only the pids
 the shell itself hands out, and the pi extension records the pid Node reports,
 which is the native Windows one, so the ticker falls back to the native process
 list for pids the shell does not know.
@@ -313,6 +320,14 @@ so pointing the ticker at that command brings them back. That call costs about
 command the turn has not ended, so the `Stop` hook does not fire. The pane stays
 on the red `busy` dot for as long as it is the user's move. The three hooks
 above cannot tell that an approval prompt is on screen.
+
+**A codex session that crashed on Windows keeps its indicator.** The hook
+records the pid of its parent, which is the codex process, but on Windows codex
+is a native process that the shell running the hook numbers as `1`, pointing at
+nothing, and codex passes no pid of its own to a hook. The hook writes `0` there
+instead, which tells the ticker not to guess, so the indicator stays until codex
+removes it through the `SessionEnd` hook. A codex that dies without running that
+hook leaves the indicator behind.
 
 **Claude Code sessions do not appear under zellij.** Claude Code's own session
 file fills the `tmux` field only for a tmux or psmux pane, never for a zellij
