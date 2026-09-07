@@ -7,13 +7,19 @@
 # codex 는 훅을 부를 때 자기 환경을 물려주므로 mux 가 심어 둔 환경변수로 pane 을
 # 알 수 있고, 훅의 부모가 codex 프로세스라서 PPID 가 그 세션의 pid 다.
 #
-# 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>
+# 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/codex-<pane>
 # 내용: "<상태> <pid>"
 #
 # mux 는 codex 프로세스 환경에서 판별한다. tmux 와 그 별칭(psmux 포함)은
 # TMUX_PANE 을, zellij 는 ZELLIJ_PANE_ID 를 심어 두므로 어느 것이 있는지로
 # 정하고, pane id 표기는 그 mux 가 원래 쓰는 그대로 남긴다(tmux 계열은 %
 # 를 뗀 숫자, zellij 는 ZELLIJ_PANE_ID 값 그대로).
+#
+# psmux 는 window_id 와 pane_id 를 세션마다 따로 채번해서, 서로 다른
+# 세션이 같은 pane 번호를 가질 수 있다. 세션 이름까지 넣어야 그 둘을
+# 가른다. tmux 는 pane_id 가 이미 서버 전체 고유라 세션 서브디렉터리가
+# 없어도 됐지만, 모든 mux 에 공통으로 두면 소비자 쪽 코드가 mux 마다
+# 갈리지 않는다.
 #
 # 인자로 상태를 받는다. 어느 훅이 부르는지는 hooks.json 이 정한다.
 #   busy    돌고 있다
@@ -24,14 +30,17 @@ set -u
 if [ -n "${TMUX_PANE:-}" ]; then
   mux=tmux
   pane=${TMUX_PANE#%}
+  session=$(tmux display-message -t "$TMUX_PANE" -p '#S' 2>/dev/null) || exit 0
 elif [ -n "${ZELLIJ_PANE_ID:-}" ]; then
   mux=zellij
   pane=$ZELLIJ_PANE_ID
+  session=${ZELLIJ_SESSION_NAME:-}
 else
   exit 0   # 알려진 mux 밖에서는 표시할 곳이 없다
 fi
+[ -n "$session" ] || exit 0   # 세션을 모르면 다른 세션의 pane 과 가를 수 없다
 
-dir="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)/$mux"
+dir="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)/$mux/$session"
 file="$dir/codex-$pane"
 
 case "${1:-}" in

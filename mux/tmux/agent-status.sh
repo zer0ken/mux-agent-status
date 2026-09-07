@@ -3,9 +3,11 @@
 #
 # 상태는 에이전트가 스스로 쓴 것을 읽는다. Claude Code 는 세션마다
 # ~/.claude/sessions/<pid>.json 을 갱신하고, pi 와 codex 는 이 저장소가 담은
-# 확장과 훅이 $TMPDIR/mux-agent-status-<uid>/<mux>/<에이전트>-<pane> 을
-# 갱신한다. 이 티커는 자기 몫인 tmux 서브디렉터리만 읽는다. psmux 는 tmux
-# CLI 의 별칭이라 같은 서브디렉터리를 쓴다. 프로세스 탐색은 필요 없다.
+# 확장과 훅이 $TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/<에이전트>-<pane>
+# 을 갱신한다. 이 티커는 자기 몫인 tmux 서브디렉터리 아래를 세션 구분 없이
+# 다 읽는다. tmux 의 pane_id 는 서버 전체에서 고유해서 어느 세션 아래
+# 있었는지는 상관없다. psmux 는 tmux CLI 의 별칭이라 같은 서브디렉터리를
+# 쓴다. 프로세스 탐색은 필요 없다.
 #
 # 어휘는 claude-session-manager 와 같다.
 #   waiting  입력이 필요하다
@@ -79,7 +81,7 @@ while :; do
   done
 
   # ── 확장과 훅이 쓴 상태 파일. 프로세스가 죽었으면 파일을 치운다 ──
-  for f in "$STATE_DIR"/pi-* "$STATE_DIR"/codex-*; do
+  for f in "$STATE_DIR"/*/pi-* "$STATE_DIR"/*/codex-*; do
     base=${f##*/}
     pane="%${base#*-}"
     read -r pst pid 2>/dev/null < "$f" || continue

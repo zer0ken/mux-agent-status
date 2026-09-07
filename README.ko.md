@@ -2,9 +2,9 @@
 
 [English](README.md)
 
-mux-agent-status 는 tmux 상태바에 Claude Code, codex, pi 세션의 상태를 표시한다.
-창을 여러 개 열어 두었을 때 어느 창이 입력을 기다리는지, 어느 창이 아직 돌고
-있는지를 창을 옮기지 않고 알 수 있다.
+mux-agent-status 는 tmux 와 psmux 의 상태바에 Claude Code, codex, pi 세션의
+상태를 표시한다. 창을 여러 개 열어 두었을 때 어느 창이 입력을 기다리는지,
+어느 창이 아직 돌고 있는지를 창을 옮기지 않고 알 수 있다.
 
 ## 상태 구분
 
@@ -69,6 +69,19 @@ set -g window-status-format "#I #{E:@agent_window_indicator}#W"
 set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
 ```
 
+psmux 는 사용자 정의 옵션의 pane 과 창 스코프를 저장하지 않아 이 방식을
+그대로 쓸 수 없다. `psmux.conf` 에는 별도 진입점을 넣는다. psmux 의
+`run-shell` 은 명령을 POSIX 셸이 아니라 PowerShell 로 돌리므로, 진입점은
+bash 티커를 별도 프로세스로 띄우는 `.ps1` 파일이다.
+
+```tmux
+run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"
+```
+
+psmux 쪽 티커는 옵션에 넣어 두고 참조하는 대신, 완성된 집계 문자열을 창
+이름 뒤에 직접 붙인다. 원래 창 이름은 그대로 두고 상태바 포맷을 고칠 자리도
+없어서, 설치 외에 추가로 손볼 곳이 없다.
+
 ## pi 연동
 
 pi 는 실행 중인 세션의 목록도 상태 파일도 내보내지 않는다. 그래서 이 저장소가
@@ -79,11 +92,11 @@ pi 는 실행 중인 세션의 목록도 상태 파일도 내보내지 않는다
 pi install git:github.com/zer0ken/mux-agent-status
 ```
 
-확장은 pi 프로세스 환경에서 mux 를 판별해, 상태가 바뀔 때마다
-`$TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>` 에 `<상태> <pid>` 를 쓰고,
-세션이 끝나면 그 파일을 지운다. mux 를 판별하는 방법과 pane 표기는
-[동작 원리](#동작-원리)에 있다. 상태 이름은 mux-agent-status 의 나머지와
-같아서 중간에 옮겨 적는 과정이 없다.
+확장은 pi 프로세스 환경에서 mux 와 세션을 판별해, 상태가 바뀔 때마다
+`$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/pi-<pane>` 에 `<상태> <pid>` 를
+쓰고, 세션이 끝나면 그 파일을 지운다. mux 와 세션을 판별하는 방법, pane
+표기는 [동작 원리](#동작-원리)에 있다. 상태 이름은 mux-agent-status 의
+나머지와 같아서 중간에 옮겨 적는 과정이 없다.
 
 ## codex 연동
 
@@ -112,10 +125,10 @@ codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없�
 codex 는 신뢰하지 않은 훅을 돌리지 않는다. 훅을 넣은 뒤 codex 를 처음 띄우면
 codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승인해야 훅이 돈다.
 
-훅은 `$TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>` 에 `<상태> <pid>` 를
-쓰고, 세션이 끝나면 그 파일을 지운다. mux 를 판별하는 방법과 pane 표기는
-[동작 원리](#동작-원리)에 있다. 상태 이름은 mux-agent-status 의 나머지와 같아서
-중간에 옮겨 적는 과정이 없다.
+훅은 `$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/codex-<pane>` 에
+`<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. mux 와 세션을
+판별하는 방법, pane 표기는 [동작 원리](#동작-원리)에 있다. 상태 이름은
+mux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
 
 ## 옵션
 
@@ -135,6 +148,21 @@ codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승
 | `@agent_clock_color` | 비움 | clock 의 색. 비우면 marker 색을 따른다 |
 | `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | indicator 뒤에 오는 글자의 색 |
 
+psmux 는 이 값들을 옵션으로 저장하지 못해서, `mux/psmux/agent-status.sh` 는
+같은 이름의 환경변수로 값을 읽는다. 기본값도 catppuccin mocha 의 hex 값
+대신 ANSI 8색 이름을 따른다. 진입점이 티커를 띄우기 전에, 예를 들어 psmux
+를 띄우는 셸에서 미리 export 해 둔다.
+
+| 변수 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `MARKER_WAITING` | `●` | `waiting` 의 marker |
+| `MARKER_IDLE` | `●` | `idle` 의 marker |
+| `MARKER_BUSY` | `●` | `busy` 의 marker |
+| `COLOR_WAITING` | `yellow` | `waiting` marker 와 counter 의 색 |
+| `COLOR_IDLE` | `green` | `idle` marker 와 counter 의 색 |
+| `COLOR_BUSY` | `red` | `busy` marker 와 counter 의 색 |
+| `COLOR_TEXT` | `default` | indicator 뒤에 오는 창 이름의 색 |
+
 ## 동작 원리
 
 상태는 에이전트가 스스로 기록한 것을 읽는다. Claude Code 는 세션 파일을 직접
@@ -144,8 +172,8 @@ codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승
 | 에이전트 | 상태 파일 |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>` |
-| pi | `$TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/pi-<pane>` |
 
 codex 훅과 pi 확장은 자기 프로세스 환경에서 mux 를 판별한다. `TMUX_PANE` 이
 있으면 tmux 로 판별하고 pane 표기에서 앞의 `%` 를 뗀다. psmux 는 tmux CLI
@@ -153,18 +181,35 @@ codex 훅과 pi 확장은 자기 프로세스 환경에서 mux 를 판별한다.
 쓴다. `ZELLIJ_PANE_ID` 가 있으면 zellij 로 판별하고 그 값을 pane 표기로
 그대로 쓴다. 둘 다 없으면 표시할 곳이 없어 아무것도 쓰지 않는다.
 
+세션 이름은 `tmux display-message -p '#S'`(tmux 계열) 나
+`ZELLIJ_SESSION_NAME`(zellij) 으로 얻는다. psmux 는 `#{window_id}` 와
+`#{pane_id}` 를 서버 전체가 아니라 세션마다 따로 채번해서, 세션이 다르면
+같은 pane 번호가 겹칠 수 있다. 세션 이름을 경로에 넣어야 그 둘을 가른다.
+tmux 는 pane_id 가 이미 서버 전체 고유라 이 계층이 없어도 됐지만, 모든
+mux 에 공통으로 둬서 소비자 쪽 코드가 mux 마다 갈리지 않는다. 세션을 얻지
+못하면 다른 세션의 pane 과 가를 수 없으므로 아무것도 쓰지 않는다.
+
 에이전트마다 상태를 어떻게 남기는지는 `agents/<에이전트>/` 가 담고 있다.
 Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/README.ko.md)
 에 있다.
 
-`mux/tmux/agent-status.sh` 가 티커다. 1초마다 돌면서 tmux 포맷만으로는 할 수 없는 두
-가지를 맡는다.
+`mux/tmux/agent-status.sh` 가 tmux 의 티커다. 1초마다 돌면서 tmux 포맷만으로는
+할 수 없는 두 가지를 맡는다.
 
-- 상태 파일을 읽어 pane 옵션으로 옮긴다
+- 상태 파일을 세션 구분 없이 읽어 pane 옵션으로 옮긴다(pane_id 가 서버 전체
+  고유라 어느 세션 아래 있었는지는 상관없다)
 - 창에 속한 pane 을 상태별로 센다
 
-티커는 값이 바뀐 pane 과 창에만 옵션을 쓴다. tmux 서버마다 하나만 돌고 서버가
-끝나면 함께 끝난다.
+`mux/psmux/agent-status.sh` 가 psmux 의 티커다. 옵션을 못 쓰는 대신 창
+이름 자체에 집계를 붙이고, 창을 가리킬 때마다 "세션 이름:창 인덱스" 형태의
+정규 타겟만 쓴다. `#{window_id}` 나 세션 없는 인덱스만으로 창을 가리키면
+같은 번호를 쓰는 다른 세션의 창이 바뀔 수 있어서다. 색은 창 이름 문자열
+안에 tmux 포맷 이스케이프(`#[fg=...]`)로 얹혀 함께 저장된다. 화면에 창
+이름을 그릴 때는 psmux 가 이 이스케이프를 해석해 색으로 보여주지만, 이름을
+글자 그대로 돌려주는 명령에는 이스케이프가 그대로 찍힌다.
+
+두 티커 모두 값이 바뀐 대상에만 쓰고, 서버마다 하나만 돌고 서버가 끝나면
+함께 끝난다.
 
 ## 저장소 구조
 
@@ -173,13 +218,15 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 
 | 디렉터리 | 담고 있는 것 |
 | --- | --- |
-| `mux/tmux` | 진입점과 티커. 상태 파일을 읽어 tmux 옵션으로 옮긴다 |
+| `mux/tmux` | tmux 진입점과 티커. 상태 파일을 읽어 tmux 옵션으로 옮긴다 |
+| `mux/psmux` | psmux 진입점과 티커. 상태 파일을 읽어 창 이름에 집계를 붙인다 |
 | `agents/claude` | Claude Code 의 상태 파일을 읽는 원리를 적은 문서 |
 | `agents/codex` | codex 훅이 부르는 스크립트 |
 | `agents/pi` | pi 확장 |
 
-에이전트는 상태를 `$TMPDIR/mux-agent-status-<uid>/<mux>/<에이전트>-<pane>` 에
-남기고, 각 mux 소비자는 자기 이름의 서브디렉터리만 읽는다. 두 쪽은 이 경로와
+에이전트는 상태를
+`$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/<에이전트>-<pane>` 에 남기고,
+각 mux 소비자는 자기 이름의 서브디렉터리 아래만 읽는다. 두 쪽은 이 경로와
 세 상태 이름으로만 이어져 있다.
 
 ## 제약
@@ -205,9 +252,26 @@ Claude 세션의 indicator 만 사라지고 codex 와 pi 세션은 그대로 동
 값이 아니다. codex 와 pi 는 이 저장소가 담은 훅과 확장이 두 mux 를 모두
 가리므로 zellij 에서도 그대로 나온다.
 
+**psmux 에서는 pane 단위 indicator 를 못 그린다.** psmux 는 pane 과 창
+스코프의 사용자 정의 옵션을 저장하지 않아서, `mux/tmux` 가 쓰는 pane
+indicator(marker 와 clock 을 pane border 에 얹는 것) 방식을 psmux 에는
+쓸 수 없다. `mux/psmux` 는 window indicator 에 해당하는 집계만 창 이름에
+붙인다.
+
+**psmux 의 세션 이름은 경로에 그대로 들어간다.** 세션 이름에 `/` 가 있으면
+상태 파일 경로가 어긋난다. tmux 와 psmux 모두 세션 이름에 `/` 를 허용하지
+않는 것이 보통이지만, 이 저장소는 그 값을 따로 검증하지 않는다.
+
+**psmux.conf 를 다시 읽어도 티커가 뜨지 않는다.** `run-shell` 은 프롬프트에서
+직접 치면 동작하지만, `source-file` 로 설정을 다시 읽는 경로에서는 psmux 가
+이 명령을 돌리지 않는 것으로 보인다. psmux 를 새로 띄우면 진입점이 정상
+동작하고, 이미 떠 있는 상태에서 설정만 다시 읽었을 때만
+`run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"` 을 프롬프트에서
+한 번 직접 쳐야 한다.
+
 ## 요구 사항
 
-- tmux 3.2 이상
+- tmux 3.2 이상, 또는 PowerShell 이 PATH 에 있는 psmux
 - bash 5.0 이상
 - Claude Code 2.1 이상
 - codex 0.152 이상
