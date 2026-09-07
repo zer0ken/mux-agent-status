@@ -1,6 +1,6 @@
 {
   "name": "mux-agent-status",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Show Claude Code, codex and pi session state in the tmux status bar",
   "license": "MIT",
   "repository": {
