@@ -121,20 +121,26 @@ codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없�
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
+      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
+      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
+      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
     ]
   }
 }
 ```
 
+명령이 스크립트만 적지 않고 `bash` 를 앞에 둔다. codex 는 훅 명령을 셸에
+넘기지 않고 프로세스로 띄우는데, Windows 는 `.sh` 로 끝나는 경로를 실행하지
+못한다. 그러면 codex 는 훅이 끝났다고 보고하지만 스크립트는 돌지 않는다. 앞의
+`~` 는 codex 가 스스로 펼쳐서 이 한 줄이 어느 OS 에서나 그대로 동작한다.
+
 codex 는 신뢰하지 않은 훅을 돌리지 않는다. 훅을 넣은 뒤 codex 를 처음 띄우면
 codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승인해야 훅이 돈다.
+`hooks.json` 을 고치면 그 승인을 다시 묻는다.
 
 훅은 `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/codex-<pane>` 에
 `<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. mux 와 세션을
@@ -241,7 +247,9 @@ pane 이 어느 탭에 속하는지는 zellij 에 pane 목록을 물어 얻는�
 돌고 서버가 끝나면 함께 끝나며, zellij 의 티커는 기계마다 하나가 돈다.
 
 에이전트가 상태 파일을 지우지 못하고 죽으면 티커가 그 파일을 치운다. 파일에
-적힌 pid 로 그 프로세스가 아직 도는지 보고 판단한다. Windows 에서는 이 판단이
+적힌 pid 로 그 프로세스가 아직 도는지 보고 판단한다. pid 가 `0` 이면 쓴 쪽이
+자기 프로세스를 알아내지 못했다는 뜻이고, 티커는 그 파일을 에이전트가 지울
+때까지 그대로 둔다. Windows 에서는 이 판단이
 두 단계다. `kill -0` 은 셸이 스스로 매긴 pid 만 알아보는데, pi 확장은 Node 가
 보고하는 pid, 즉 Windows 네이티브 pid 를 적는다. 그래서 셸이 모르는 pid 는
 네이티브 프로세스 목록으로 다시 확인한다.
@@ -287,6 +295,13 @@ Claude 세션의 indicator 만 사라지고 codex 와 pi 세션은 그대로 동
 **codex 의 승인 대기는 `busy` 로 나온다.** codex 가 명령 실행 승인을 물어도 턴은
 끝나지 않아서 `Stop` 훅이 돌지 않는다. 사용자가 답해야 하는 동안 pane 은 `busy` 의
 빨간 점으로 남는다. 걸어 둔 훅 세 개로는 승인 프롬프트가 떠 있다는 것을 알 수 없다.
+
+**Windows 에서 codex 가 죽으면 indicator 가 남는다.** 훅은 자기 부모의 pid 를
+적고 그 부모가 codex 프로세스다. 그런데 Windows 의 codex 는 네이티브
+프로세스라서, 훅을 돌리는 셸이 그 부모에 `1` 을 매기고 그 `1` 은 어느 프로세스도
+가리키지 않는다. codex 가 자기 pid 를 훅에 주지도 않는다. 그래서 훅은 그 자리에
+`0` 을 적어 티커가 짐작하지 않게 하고, indicator 는 codex 가 `SessionEnd` 훅으로
+지울 때까지 남는다. 그 훅을 돌리지 못하고 죽은 codex 는 indicator 를 남긴다.
 
 **zellij 에서는 Claude Code 세션이 나오지 않는다.** Claude Code 는 자기 세션
 파일의 `tmux` 필드에 tmux 와 psmux 의 pane 만 채우고 zellij 의 pane 은 채우지

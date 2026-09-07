@@ -5,7 +5,11 @@
 # codex 는 세션의 상태를 파일로 내보내지 않는다. Claude Code 의
 # ~/.claude/sessions/<pid>.json 에 해당하는 것이 없어서 이 스크립트가 대신 쓴다.
 # codex 는 훅을 부를 때 자기 환경을 물려주므로 mux 가 심어 둔 환경변수로 pane 을
-# 알 수 있고, 훅의 부모가 codex 프로세스라서 PPID 가 그 세션의 pid 다.
+# 알 수 있다. 훅의 부모는 codex 프로세스라서 POSIX 에서는 PPID 가 그 세션의
+# pid 다. Windows 에서는 codex 가 네이티브 프로세스라 MSYS 가 그 부모에 1 을
+# 매기고, 그 1 은 어느 프로세스도 가리키지 않는다. codex 는 자기 pid 를 훅
+# 환경에 넣어 주지도 않는다. 그래서 부모를 확인할 수 없으면 pid 대신 0 을
+# 적는다. 소비자는 0 을 보면 생존 검사를 건너뛰고 파일을 그대로 둔다.
 #
 # 파일: $TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/codex-<pane>
 # 내용: "<상태> <pid>"
@@ -56,8 +60,12 @@ fi
 dir="$STATE_ROOT/$mux/$session"
 file="$dir/codex-$pane"
 
+# 부모를 확인할 수 없으면 0 을 적는다. 소비자가 0 을 생존 검사 면제로 읽는다.
+pid=$PPID
+kill -0 "$pid" 2>/dev/null || pid=0
+
 case "${1:-}" in
-  busy|idle) mkdir -p "$dir" && printf '%s %s\n' "$1" "$PPID" > "$file" ;;
+  busy|idle) mkdir -p "$dir" && printf '%s %s\n' "$1" "$pid" > "$file" ;;
   remove)    rm -f "$file" ;;
 esac
 
