@@ -70,10 +70,12 @@ set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_titl
 ```
 
 psmux 는 사용자 정의 옵션의 pane 과 창 스코프를 저장하지 않아 이 방식을
-그대로 쓸 수 없다. `psmux.conf` 에는 별도 진입점을 넣는다.
+그대로 쓸 수 없다. `psmux.conf` 에는 별도 진입점을 넣는다. psmux 의
+`run-shell` 은 명령을 POSIX 셸이 아니라 PowerShell 로 돌리므로, 진입점은
+bash 티커를 별도 프로세스로 띄우는 `.ps1` 파일이다.
 
 ```tmux
-run-shell "~/mux-agent-status/mux/psmux/agent-status.tmux"
+run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"
 ```
 
 psmux 쪽 티커는 옵션에 넣어 두고 참조하는 대신, 완성된 집계 문자열을 창
@@ -146,6 +148,21 @@ mux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 �
 | `@agent_clock_color` | 비움 | clock 의 색. 비우면 marker 색을 따른다 |
 | `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | indicator 뒤에 오는 글자의 색 |
 
+psmux 는 이 값들을 옵션으로 저장하지 못해서, `mux/psmux/agent-status.sh` 는
+같은 이름의 환경변수로 값을 읽는다. 기본값도 catppuccin mocha 의 hex 값
+대신 ANSI 8색 이름을 따른다. 진입점이 티커를 띄우기 전에, 예를 들어 psmux
+를 띄우는 셸에서 미리 export 해 둔다.
+
+| 변수 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `MARKER_WAITING` | `●` | `waiting` 의 marker |
+| `MARKER_IDLE` | `●` | `idle` 의 marker |
+| `MARKER_BUSY` | `●` | `busy` 의 marker |
+| `COLOR_WAITING` | `yellow` | `waiting` marker 와 counter 의 색 |
+| `COLOR_IDLE` | `green` | `idle` marker 와 counter 의 색 |
+| `COLOR_BUSY` | `red` | `busy` marker 와 counter 의 색 |
+| `COLOR_TEXT` | `default` | indicator 뒤에 오는 창 이름의 색 |
+
 ## 동작 원리
 
 상태는 에이전트가 스스로 기록한 것을 읽는다. Claude Code 는 세션 파일을 직접
@@ -186,7 +203,10 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 `mux/psmux/agent-status.sh` 가 psmux 의 티커다. 옵션을 못 쓰는 대신 창
 이름 자체에 집계를 붙이고, 창을 가리킬 때마다 "세션 이름:창 인덱스" 형태의
 정규 타겟만 쓴다. `#{window_id}` 나 세션 없는 인덱스만으로 창을 가리키면
-같은 번호를 쓰는 다른 세션의 창이 바뀔 수 있어서다.
+같은 번호를 쓰는 다른 세션의 창이 바뀔 수 있어서다. 색은 창 이름 문자열
+안에 tmux 포맷 이스케이프(`#[fg=...]`)로 얹혀 함께 저장된다. 화면에 창
+이름을 그릴 때는 psmux 가 이 이스케이프를 해석해 색으로 보여주지만, 이름을
+글자 그대로 돌려주는 명령에는 이스케이프가 그대로 찍힌다.
 
 두 티커 모두 값이 바뀐 대상에만 쓰고, 서버마다 하나만 돌고 서버가 끝나면
 함께 끝난다.
@@ -242,9 +262,16 @@ indicator(marker 와 clock 을 pane border 에 얹는 것) 방식을 psmux 에�
 상태 파일 경로가 어긋난다. tmux 와 psmux 모두 세션 이름에 `/` 를 허용하지
 않는 것이 보통이지만, 이 저장소는 그 값을 따로 검증하지 않는다.
 
+**psmux.conf 를 다시 읽어도 티커가 뜨지 않는다.** `run-shell` 은 프롬프트에서
+직접 치면 동작하지만, `source-file` 로 설정을 다시 읽는 경로에서는 psmux 가
+이 명령을 돌리지 않는 것으로 보인다. psmux 를 새로 띄우면 진입점이 정상
+동작하고, 이미 떠 있는 상태에서 설정만 다시 읽었을 때만
+`run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"` 을 프롬프트에서
+한 번 직접 쳐야 한다.
+
 ## 요구 사항
 
-- tmux 3.2 이상
+- tmux 3.2 이상, 또는 PowerShell 이 PATH 에 있는 psmux
 - bash 5.0 이상
 - Claude Code 2.1 이상
 - codex 0.152 이상

@@ -41,9 +41,18 @@ STARTUP_TRIES=30
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
 STATE_DIR="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)/tmux"
 
-MARKER_WAITING="●"
-MARKER_IDLE="●"
-MARKER_BUSY="●"
+# ANSI 8색 이름을 기본값으로 쓴다. 터미널 테마가 그 색을 정하므로, 이
+# 스크립트는 어떤 RGB 값도 강제하지 않는다. 환경변수로 값을 미리 채워 두면
+# 이 기본값 대신 그 값을 쓴다(psmux 는 이 값을 옵션으로 저장하지 못하니
+# 개인 설정에서 값을 다르게 쓰려면 이 스크립트를 부르기 전에 환경변수로
+# 넣어 둔다).
+MARKER_WAITING="${MARKER_WAITING:-●}"
+MARKER_IDLE="${MARKER_IDLE:-●}"
+MARKER_BUSY="${MARKER_BUSY:-●}"
+COLOR_WAITING="${COLOR_WAITING:-yellow}"
+COLOR_IDLE="${COLOR_IDLE:-green}"
+COLOR_BUSY="${COLOR_BUSY:-red}"
+COLOR_TEXT="${COLOR_TEXT:-default}"
 ORDER=(waiting idle busy)
 
 ready=""
@@ -136,11 +145,11 @@ while :; do
       n=${count[$wid/$s]:-0}
       [ "$n" -gt 0 ] || continue
       case "$s" in
-        waiting) m=$MARKER_WAITING ;;
-        idle)    m=$MARKER_IDLE ;;
-        busy)    m=$MARKER_BUSY ;;
+        waiting) m=$MARKER_WAITING; c=$COLOR_WAITING ;;
+        idle)    m=$MARKER_IDLE;    c=$COLOR_IDLE ;;
+        busy)    m=$MARKER_BUSY;    c=$COLOR_BUSY ;;
       esac
-      suffix+="${m}${n} "
+      suffix+="#[fg=$c]${m} ${n}#[fg=$COLOR_TEXT] "
     done
     suffix=${suffix% }
 

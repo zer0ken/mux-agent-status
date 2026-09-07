@@ -74,9 +74,12 @@ set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_titl
 
 psmux does not persist user-defined options at the pane or window scope, so
 this approach does not carry over. `psmux.conf` gets a separate entry point.
+`run-shell` on psmux runs the command through PowerShell rather than a POSIX
+shell, so the entry point is a `.ps1` file that launches the bash ticker as
+its own process.
 
 ```tmux
-run-shell "~/mux-agent-status/mux/psmux/agent-status.tmux"
+run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"
 ```
 
 The psmux ticker skips the store-in-an-option-and-reference-it-from-a-format
@@ -156,6 +159,22 @@ defaults with `set -ogq`.
 | `@agent_clock_color` | empty | Color of the clock. Empty follows the marker |
 | `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | Color of the text that follows an indicator |
 
+psmux does not persist these as options, so `mux/psmux/agent-status.sh` reads
+them from environment variables instead, with the same defaults falling back
+to the ANSI 8-color names rather than the catppuccin mocha hex values. Set
+them before the entry point launches the ticker, for instance by exporting
+them earlier in the shell that starts psmux.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `MARKER_WAITING` | `●` | Marker for `waiting` |
+| `MARKER_IDLE` | `●` | Marker for `idle` |
+| `MARKER_BUSY` | `●` | Marker for `busy` |
+| `COLOR_WAITING` | `yellow` | Color of the `waiting` marker and counter |
+| `COLOR_IDLE` | `green` | Color of the `idle` marker and counter |
+| `COLOR_BUSY` | `red` | Color of the `busy` marker and counter |
+| `COLOR_TEXT` | `default` | Color of the window name that follows the indicator |
+
 ## How it works
 
 The state comes from what each agent records about itself. Claude Code writes
@@ -200,7 +219,10 @@ covers the two things a tmux format cannot do on its own.
 appends the aggregate directly to the window name, and every place it targets
 a window uses the full "session name:window index" form - targeting by
 `#{window_id}` or a session-less index alone would rename another session's
-window that happens to share the number.
+window that happens to share the number. Color rides along as a tmux format
+escape (`#[fg=...]`) embedded in the window name string itself; psmux
+interprets that escape when it renders the window name to the screen, even
+though commands that print the name back as text show it unevaluated.
 
 Both tickers write only to targets whose value changed. One ticker runs per
 server and ends when that server ends.
@@ -258,9 +280,15 @@ window indicator's aggregate to the window name.
 session name would break it. Neither tmux nor psmux ordinarily allow a `/` in
 a session name, but this repository does not validate the value itself.
 
+**Reloading psmux.conf does not start the ticker.** `run-shell` works when
+typed at the prompt, but psmux does not appear to run it while reloading
+config with `source-file`. Starting psmux fresh runs the entry point normally;
+only a live reload needs `run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"`
+typed by hand once.
+
 ## Requirements
 
-- tmux 3.2 or newer
+- tmux 3.2 or newer, or psmux with PowerShell on the PATH
 - bash 5.0 or newer
 - Claude Code 2.1 or newer
 - codex 0.152 or newer
