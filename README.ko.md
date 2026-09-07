@@ -79,15 +79,17 @@ pi 는 실행 중인 세션의 목록도 상태 파일도 내보내지 않는다
 pi install git:github.com/zer0ken/mux-agent-status
 ```
 
-확장은 상태가 바뀔 때마다 `$TMPDIR/mux-agent-status-<uid>/pi-<pane>` 에
-`<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. 상태 이름은
-mux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
+확장은 pi 프로세스 환경에서 mux 를 판별해, 상태가 바뀔 때마다
+`$TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>` 에 `<상태> <pid>` 를 쓰고,
+세션이 끝나면 그 파일을 지운다. mux 를 판별하는 방법과 pane 표기는
+[동작 원리](#동작-원리)에 있다. 상태 이름은 mux-agent-status 의 나머지와
+같아서 중간에 옮겨 적는 과정이 없다.
 
 ## codex 연동
 
 codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없다. 세션을 pane 에 이을
 값이 없어서, 이 저장소가 상태를 기록하는 훅 스크립트를 함께 담고 있다. codex 는 훅을
-부를 때 자기 환경을 물려주므로, 스크립트는 `TMUX_PANE` 으로 pane 을 안다.
+부를 때 자기 환경을 물려주므로, 스크립트는 그 환경에서 mux 와 pane 을 안다.
 
 `~/.codex/hooks.json` 에 훅 세 개를 넣는다.
 
@@ -110,8 +112,9 @@ codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없�
 codex 는 신뢰하지 않은 훅을 돌리지 않는다. 훅을 넣은 뒤 codex 를 처음 띄우면
 codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승인해야 훅이 돈다.
 
-훅은 `$TMPDIR/mux-agent-status-<uid>/codex-<pane>` 에 `<상태> <pid>` 를 쓰고,
-세션이 끝나면 그 파일을 지운다. 상태 이름은 mux-agent-status 의 나머지와 같아서
+훅은 `$TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>` 에 `<상태> <pid>` 를
+쓰고, 세션이 끝나면 그 파일을 지운다. mux 를 판별하는 방법과 pane 표기는
+[동작 원리](#동작-원리)에 있다. 상태 이름은 mux-agent-status 의 나머지와 같아서
 중간에 옮겨 적는 과정이 없다.
 
 ## 옵션
@@ -141,8 +144,14 @@ codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승
 | 에이전트 | 상태 파일 |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/mux-agent-status-<uid>/codex-<pane>` |
-| pi | `$TMPDIR/mux-agent-status-<uid>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>` |
+
+codex 훅과 pi 확장은 자기 프로세스 환경에서 mux 를 판별한다. `TMUX_PANE` 이
+있으면 tmux 로 판별하고 pane 표기에서 앞의 `%` 를 뗀다. psmux 는 tmux CLI
+의 별칭이라 `TMUX_PANE` 을 그대로 물려주므로 같은 `tmux` 서브디렉터리를
+쓴다. `ZELLIJ_PANE_ID` 가 있으면 zellij 로 판별하고 그 값을 pane 표기로
+그대로 쓴다. 둘 다 없으면 표시할 곳이 없어 아무것도 쓰지 않는다.
 
 에이전트마다 상태를 어떻게 남기는지는 `agents/<에이전트>/` 가 담고 있다.
 Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/README.ko.md)
@@ -169,8 +178,9 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 | `agents/codex` | codex 훅이 부르는 스크립트 |
 | `agents/pi` | pi 확장 |
 
-에이전트는 상태를 `$TMPDIR/mux-agent-status-<uid>/<에이전트>-<pane>` 에 남기고,
-mux 는 그 디렉터리만 읽는다. 두 쪽은 이 경로와 세 상태 이름으로만 이어져 있다.
+에이전트는 상태를 `$TMPDIR/mux-agent-status-<uid>/<mux>/<에이전트>-<pane>` 에
+남기고, 각 mux 소비자는 자기 이름의 서브디렉터리만 읽는다. 두 쪽은 이 경로와
+세 상태 이름으로만 이어져 있다.
 
 ## 제약
 
@@ -188,6 +198,12 @@ Claude 세션의 indicator 만 사라지고 codex 와 pi 세션은 그대로 동
 **codex 의 승인 대기는 `busy` 로 나온다.** codex 가 명령 실행 승인을 물어도 턴은
 끝나지 않아서 `Stop` 훅이 돌지 않는다. 사용자가 답해야 하는 동안 pane 은 `busy` 의
 빨간 점으로 남는다. 걸어 둔 훅 세 개로는 승인 프롬프트가 떠 있다는 것을 알 수 없다.
+
+**zellij 에서는 Claude Code 세션이 나오지 않는다.** Claude Code 는 자기 세션
+파일의 `tmux` 필드에 tmux 와 psmux 의 pane 만 채우고 zellij 의 pane 은 채우지
+않는다. Claude Code 가 세션 파일을 스스로 쓰므로 이 저장소가 고칠 수 있는
+값이 아니다. codex 와 pi 는 이 저장소가 담은 훅과 확장이 두 mux 를 모두
+가리므로 zellij 에서도 그대로 나온다.
 
 ## 요구 사항
 
