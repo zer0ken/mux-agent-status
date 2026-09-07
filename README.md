@@ -132,23 +132,42 @@ Put three hooks in `~/.codex/hooks.json`.
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh busy" } ] }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh idle" } ] }
     ],
     "SessionEnd": [
-      { "hooks": [ { "type": "command", "command": "bash ~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
+      { "hooks": [ { "type": "command", "command": "~/mux-agent-status/agents/codex/agent-status.sh remove" } ] }
     ]
   }
 }
 ```
 
-The command names `bash` rather than the script alone. codex spawns a hook
-command as a process rather than through a shell, and on Windows a path ending
-in `.sh` is not something the system can execute, so the hook would be reported
-as completed while never running. codex expands the leading `~` itself, so the
-same line works on every OS.
+On Windows the same three hooks name a PowerShell script instead.
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "pwsh -NoProfile -File ~/mux-agent-status/agents/codex/agent-status.ps1 busy" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "pwsh -NoProfile -File ~/mux-agent-status/agents/codex/agent-status.ps1 idle" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "pwsh -NoProfile -File ~/mux-agent-status/agents/codex/agent-status.ps1 remove" } ] }
+    ]
+  }
+}
+```
+
+codex spawns a hook command as a process rather than through a shell. Windows
+cannot execute a path ending in `.sh`, and naming `bash` does not help there
+either, because `bash` on a stock Windows PATH is `System32ash.exe`, the WSL
+launcher, rather than the bash that ships with Git. `agent-status.ps1` does the
+same work natively, so nothing outside PowerShell has to be present. codex
+expands the leading `~` itself.
 
 codex runs no hook it does not trust. On the first codex launch after the hooks
 are in place, codex shows a review screen. The hooks run once the user approves
@@ -287,7 +306,7 @@ Adding a mux or an agent then touches one place.
 | `mux/psmux` | The psmux entry point and ticker, which carry state files into window names |
 | `mux/zellij` | The zellij ticker, which carries state files into tab names |
 | `agents/claude` | A document on the principle behind reading the Claude Code state file |
-| `agents/codex` | The script the codex hooks call |
+| `agents/codex` | The scripts the codex hooks call, one per OS family |
 | `agents/pi` | The pi extension |
 
 An agent leaves its state in
@@ -320,14 +339,6 @@ so pointing the ticker at that command brings them back. That call costs about
 command the turn has not ended, so the `Stop` hook does not fire. The pane stays
 on the red `busy` dot for as long as it is the user's move. The three hooks
 above cannot tell that an approval prompt is on screen.
-
-**A codex session that crashed on Windows keeps its indicator.** The hook
-records the pid of its parent, which is the codex process, but on Windows codex
-is a native process that the shell running the hook numbers as `1`, pointing at
-nothing, and codex passes no pid of its own to a hook. The hook writes `0` there
-instead, which tells the ticker not to guess, so the indicator stays until codex
-removes it through the `SessionEnd` hook. A codex that dies without running that
-hook leaves the indicator behind.
 
 **Claude Code sessions do not appear under zellij.** Claude Code's own session
 file fills the `tmux` field only for a tmux or psmux pane, never for a zellij
