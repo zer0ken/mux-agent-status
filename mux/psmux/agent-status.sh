@@ -10,7 +10,7 @@
 #
 # 상태는 에이전트가 스스로 쓴 것을 읽는다. Claude Code 는 세션마다
 # ~/.claude/sessions/<pid>.json 을 갱신하고, pi 와 codex 는 이 저장소가 담은
-# 확장과 훅이 $TMPDIR/mux-agent-status-<uid>/tmux/<세션>/<에이전트>-<pane>
+# 확장과 훅이 $TMPDIR/mux-agent-status[-<uid>]/tmux/<세션>/<에이전트>-<pane>
 # 을 갱신한다. psmux 는 tmux CLI 의 별칭이라 TMUX_PANE 을 tmux 와 같은
 # 포맷으로 물려주므로, codex 와 pi 는 이미 tmux 서브디렉터리에 쓴다. 이
 # 티커는 그 tmux 서브디렉터리 아래를 세션별로 나눠 읽는다.
@@ -39,7 +39,20 @@ INTERVAL=1
 STARTUP_TRIES=30
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
-STATE_DIR="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)/tmux"
+# Windows 의 임시 디렉터리는 이미 사용자마다 갈라져 있어 경로에 uid 를 넣지
+# 않는다. POSIX 는 /tmp 를 공용으로 쓰므로 uid 로 갈라 둔다. Node 는 Windows
+# 에서 process.getuid 를 제공하지 않아 pi 확장이 bash 의 id -u 와 같은 값을 낼
+# 수 없으니, 쓰는 쪽과 읽는 쪽이 OS 로 갈라 같은 경로를 만든다.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+  *)                    IS_WINDOWS= ;;
+esac
+if [ -n "$IS_WINDOWS" ]; then
+  STATE_ROOT="${TMPDIR:-/tmp}/mux-agent-status"
+else
+  STATE_ROOT="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)"
+fi
+STATE_DIR="$STATE_ROOT/tmux"
 
 # ANSI 8색 이름을 기본값으로 쓴다. 터미널 테마가 그 색을 정하므로, 이
 # 스크립트는 어떤 RGB 값도 강제하지 않는다. 환경변수로 값을 미리 채워 두면
@@ -53,6 +66,43 @@ COLOR_WAITING="${COLOR_WAITING:-yellow}"
 COLOR_IDLE="${COLOR_IDLE:-green}"
 COLOR_BUSY="${COLOR_BUSY:-red}"
 COLOR_TEXT="${COLOR_TEXT:-default}"
+# 상태 파일에 적힌 프로세스가 살아 있는지 본다. kill -0 은 MSYS 가 매긴 PID 만
+# 알아보고, pi 확장이 적는 Node 의 process.pid 는 Windows 네이티브 PID 라서 Git
+# Bash 에서는 언제나 실패한다. 그 경우 ps -W 가 보고하는 WINPID 로 다시 본다.
+# WINPID 목록은 $WINPID_TTL 초마다 한 번만 읽는다.
+WINPID_TTL=5
+declare -A live_winpid=()
+winpids_at=0
+read_winpids() {
+  live_winpid=()
+  local a b c w
+  while read -r a b c w _; do
+    [ -n "$w" ] && live_winpid[$w]=1
+  done < <(ps -W 2>/dev/null)
+  winpids_at=${EPOCHSECONDS:-0}
+}
+pid_alive() {
+  kill -0 "$1" 2>/dev/null && return 0
+  [ -n "$IS_WINDOWS" ] || return 1
+  # ps -W 는 프로세스를 모두 훑어 Windows 에서 값이 비싸다. 신선한 목록에 이미
+  # 있으면 그것으로 끝내고, 없을 때만 다시 읽는다. 방금 뜬 프로세스를 죽은
+  # 것으로 오판하지 않으려면 목록에 없을 때는 반드시 다시 읽어야 한다.
+  local fresh=$(( ${EPOCHSECONDS:-0} - winpids_at < WINPID_TTL ))
+  [ -n "${live_winpid[$1]:-}" ] && [ "$fresh" = 1 ] && return 0
+  read_winpids
+  [ -n "${live_winpid[$1]:-}" ]
+}
+
+# window 이름 뒤에 붙은 집계를 뗀 것을 STRIPPED 에 남긴다. 이 티커가 방금 붙인
+# 것만 떼면, 앞서 돌던 티커가 남긴 집계를 원래 이름으로 오인해 그 뒤에 또 붙는다.
+# 티커가 다시 뜰 때마다 이름이 늘어나므로, 집계의 모양을 알아보고 뗀다.
+strip_aggregate() {
+  STRIPPED=$1
+  while [[ $STRIPPED =~ ^(.*)\ #\[fg=[^]]*\][^[:space:]]+\ [0-9]+#\[fg=[^]]*\]$ ]]; do
+    STRIPPED=${BASH_REMATCH[1]}
+  done
+}
+
 ORDER=(waiting idle busy)
 
 ready=""
@@ -62,7 +112,10 @@ for _ in $(seq "$STARTUP_TRIES"); do
 done
 [ -n "$ready" ] || exit 0
 
-server_id=${TMUX%,*}; server_id=${server_id##*,}
+# 티커는 pane 밖에서도 뜬다. psmux 진입점은 티커를 psmux 의 감시 밖으로
+# 떼어내 띄우므로 TMUX 가 없을 수 있다. set -u 아래에서 그대로 펼치면
+# 폴백에 닿기 전에 죽는다.
+server_id=${TMUX:-}; server_id=${server_id%,*}; server_id=${server_id##*,}
 [ -n "$server_id" ] || server_id=$(tmux display-message -p '#{pid}' 2>/dev/null)
 [ -n "$server_id" ] || exit 0
 
@@ -98,7 +151,7 @@ while :; do
     fsess=${f%/*}; fsess=${fsess##*/}
     pane="%${base#*-}"
     read -r pst pid 2>/dev/null < "$f" || continue
-    if [ -n "${pid:-}" ] && [ "$pid" != 0 ] && ! kill -0 "$pid" 2>/dev/null; then
+    if [ -n "${pid:-}" ] && [ "$pid" != 0 ] && ! pid_alive "$pid"; then
       rm -f "$f" 2>/dev/null; continue
     fi
     case "$pst" in idle|busy|waiting) state["$fsess/$pane"]=$pst ;; esac
@@ -128,16 +181,13 @@ while :; do
   done <<< "$rows"
 
   for wid in "${!seen[@]}"; do
-    # window 이름이 바뀌었고, 그 변화가 이 티커 자신이 붙인 접미사를 뗀
-    # 결과가 아니면(사용자나 automatic-rename 이 새 이름을 준 것이면),
-    # 그 새 이름을 원래 이름으로 다시 채택한다.
+    # window 이름이 바뀌었고, 그 변화가 티커가 붙인 집계를 뗀 결과가 아니면
+    # (사용자나 automatic-rename 이 새 이름을 준 것이면) 그 새 이름을 원래
+    # 이름으로 다시 채택한다.
     cur_name=${window_name_now[$wid]}
-    stripped_of_prev_suffix=$cur_name
-    if [ -n "${prev_suffix[$wid]:-}" ]; then
-      stripped_of_prev_suffix=${cur_name%" ${prev_suffix[$wid]}"}
-    fi
-    if [ -z "${base_name[$wid]:-}" ] || [ "$stripped_of_prev_suffix" != "${base_name[$wid]}" ]; then
-      base_name[$wid]=$stripped_of_prev_suffix
+    strip_aggregate "$cur_name"
+    if [ -z "${base_name[$wid]:-}" ] || [ "$STRIPPED" != "${base_name[$wid]}" ]; then
+      base_name[$wid]=$STRIPPED
     fi
 
     suffix=""

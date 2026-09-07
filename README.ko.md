@@ -93,7 +93,7 @@ pi install git:github.com/zer0ken/mux-agent-status
 ```
 
 확장은 pi 프로세스 환경에서 mux 와 세션을 판별해, 상태가 바뀔 때마다
-`$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/pi-<pane>` 에 `<상태> <pid>` 를
+`$TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/pi-<pane>` 에 `<상태> <pid>` 를
 쓰고, 세션이 끝나면 그 파일을 지운다. mux 와 세션을 판별하는 방법, pane
 표기는 [동작 원리](#동작-원리)에 있다. 상태 이름은 mux-agent-status 의
 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
@@ -125,7 +125,7 @@ codex 는 세션마다 기록 파일을 남기지만 그 파일에 pane 이 없�
 codex 는 신뢰하지 않은 훅을 돌리지 않는다. 훅을 넣은 뒤 codex 를 처음 띄우면
 codex 가 훅을 검토하는 화면을 보여준다. 사용자가 거기서 승인해야 훅이 돈다.
 
-훅은 `$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/codex-<pane>` 에
+훅은 `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/codex-<pane>` 에
 `<상태> <pid>` 를 쓰고, 세션이 끝나면 그 파일을 지운다. mux 와 세션을
 판별하는 방법, pane 표기는 [동작 원리](#동작-원리)에 있다. 상태 이름은
 mux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 없다.
@@ -172,8 +172,8 @@ psmux 는 이 값들을 옵션으로 저장하지 못해서, `mux/psmux/agent-st
 | 에이전트 | 상태 파일 |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/codex-<pane>` |
-| pi | `$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/pi-<pane>` |
 
 codex 훅과 pi 확장은 자기 프로세스 환경에서 mux 를 판별한다. `TMUX_PANE` 이
 있으면 tmux 로 판별하고 pane 표기에서 앞의 `%` 를 뗀다. psmux 는 tmux CLI
@@ -211,6 +211,12 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 두 티커 모두 값이 바뀐 대상에만 쓰고, 서버마다 하나만 돌고 서버가 끝나면
 함께 끝난다.
 
+에이전트가 상태 파일을 지우지 못하고 죽으면 티커가 그 파일을 치운다. 파일에
+적힌 pid 로 그 프로세스가 아직 도는지 보고 판단한다. Windows 에서는 이 판단이
+두 단계다. `kill -0` 은 셸이 스스로 매긴 pid 만 알아보는데, pi 확장은 Node 가
+보고하는 pid, 즉 Windows 네이티브 pid 를 적는다. 그래서 셸이 모르는 pid 는
+네이티브 프로세스 목록으로 다시 확인한다.
+
 ## 저장소 구조
 
 디렉터리는 mux 를 아는 코드와 에이전트를 아는 코드로 나뉜다. 새 mux 나 새
@@ -225,9 +231,15 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 | `agents/pi` | pi 확장 |
 
 에이전트는 상태를
-`$TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/<에이전트>-<pane>` 에 남기고,
+`$TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/<에이전트>-<pane>` 에 남기고,
 각 mux 소비자는 자기 이름의 서브디렉터리 아래만 읽는다. 두 쪽은 이 경로와
 세 상태 이름으로만 이어져 있다.
+
+경로의 `-<uid>` 는 임시 디렉터리를 사용자끼리 공용으로 쓰는 POSIX 에만 붙는다.
+Windows 는 사용자마다 임시 디렉터리가 따로 있어 가를 것이 없으므로 이 세그먼트를
+빼고 쓴다. 쓰는 쪽과 읽는 쪽 모두 uid 값이 아니라 OS 로 이것을 판단한다. Node 는
+Windows 에서 `process.getuid` 를 제공하지 않아서, pi 확장이 셸의 `id -u` 와 같은
+숫자를 낼 수 없기 때문이다.
 
 ## 제약
 

@@ -7,7 +7,7 @@
 # codex 는 훅을 부를 때 자기 환경을 물려주므로 mux 가 심어 둔 환경변수로 pane 을
 # 알 수 있고, 훅의 부모가 codex 프로세스라서 PPID 가 그 세션의 pid 다.
 #
-# 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/codex-<pane>
+# 파일: $TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/codex-<pane>
 # 내용: "<상태> <pid>"
 #
 # mux 는 codex 프로세스 환경에서 판별한다. tmux 와 그 별칭(psmux 포함)은
@@ -40,7 +40,20 @@ else
 fi
 [ -n "$session" ] || exit 0   # 세션을 모르면 다른 세션의 pane 과 가를 수 없다
 
-dir="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)/$mux/$session"
+# Windows 의 임시 디렉터리는 이미 사용자마다 갈라져 있어 경로에 uid 를 넣지
+# 않는다. POSIX 는 /tmp 를 공용으로 쓰므로 uid 로 갈라 둔다. Node 는 Windows
+# 에서 process.getuid 를 제공하지 않아 pi 확장이 bash 의 id -u 와 같은 값을 낼
+# 수 없으니, 쓰는 쪽과 읽는 쪽이 OS 로 갈라 같은 경로를 만든다.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+  *)                    IS_WINDOWS= ;;
+esac
+if [ -n "$IS_WINDOWS" ]; then
+  STATE_ROOT="${TMPDIR:-/tmp}/mux-agent-status"
+else
+  STATE_ROOT="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)"
+fi
+dir="$STATE_ROOT/$mux/$session"
 file="$dir/codex-$pane"
 
 case "${1:-}" in

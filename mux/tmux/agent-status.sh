@@ -3,7 +3,7 @@
 #
 # 상태는 에이전트가 스스로 쓴 것을 읽는다. Claude Code 는 세션마다
 # ~/.claude/sessions/<pid>.json 을 갱신하고, pi 와 codex 는 이 저장소가 담은
-# 확장과 훅이 $TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/<에이전트>-<pane>
+# 확장과 훅이 $TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/<에이전트>-<pane>
 # 을 갱신한다. 이 티커는 자기 몫인 tmux 서브디렉터리 아래를 세션 구분 없이
 # 다 읽는다. tmux 의 pane_id 는 서버 전체에서 고유해서 어느 세션 아래
 # 있었는지는 상관없다. psmux 는 tmux CLI 의 별칭이라 같은 서브디렉터리를
@@ -24,7 +24,47 @@ INTERVAL=1
 STARTUP_TRIES=30
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions"
-STATE_DIR="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)/tmux"
+# Windows 의 임시 디렉터리는 이미 사용자마다 갈라져 있어 경로에 uid 를 넣지
+# 않는다. POSIX 는 /tmp 를 공용으로 쓰므로 uid 로 갈라 둔다. Node 는 Windows
+# 에서 process.getuid 를 제공하지 않아 pi 확장이 bash 의 id -u 와 같은 값을 낼
+# 수 없으니, 쓰는 쪽과 읽는 쪽이 OS 로 갈라 같은 경로를 만든다.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+  *)                    IS_WINDOWS= ;;
+esac
+if [ -n "$IS_WINDOWS" ]; then
+  STATE_ROOT="${TMPDIR:-/tmp}/mux-agent-status"
+else
+  STATE_ROOT="${TMPDIR:-/tmp}/mux-agent-status-$(id -u)"
+fi
+STATE_DIR="$STATE_ROOT/tmux"
+
+# 상태 파일에 적힌 프로세스가 살아 있는지 본다. kill -0 은 MSYS 가 매긴 PID 만
+# 알아보고, pi 확장이 적는 Node 의 process.pid 는 Windows 네이티브 PID 라서 Git
+# Bash 에서는 언제나 실패한다. 그 경우 ps -W 가 보고하는 WINPID 로 다시 본다.
+# WINPID 목록은 $WINPID_TTL 초마다 한 번만 읽는다.
+WINPID_TTL=5
+declare -A live_winpid=()
+winpids_at=0
+read_winpids() {
+  live_winpid=()
+  local a b c w
+  while read -r a b c w _; do
+    [ -n "$w" ] && live_winpid[$w]=1
+  done < <(ps -W 2>/dev/null)
+  winpids_at=${EPOCHSECONDS:-0}
+}
+pid_alive() {
+  kill -0 "$1" 2>/dev/null && return 0
+  [ -n "$IS_WINDOWS" ] || return 1
+  # ps -W 는 프로세스를 모두 훑어 Windows 에서 값이 비싸다. 신선한 목록에 이미
+  # 있으면 그것으로 끝내고, 없을 때만 다시 읽는다. 방금 뜬 프로세스를 죽은
+  # 것으로 오판하지 않으려면 목록에 없을 때는 반드시 다시 읽어야 한다.
+  local fresh=$(( ${EPOCHSECONDS:-0} - winpids_at < WINPID_TTL ))
+  [ -n "${live_winpid[$1]:-}" ] && [ "$fresh" = 1 ] && return 0
+  read_winpids
+  [ -n "${live_winpid[$1]:-}" ]
+}
 
 # window indicator 에 나오는 순서. 사용자가 먼저 봐야 하는 것이 왼쪽이다.
 ORDER=(waiting idle busy)
@@ -48,7 +88,9 @@ for _ in $(seq "$STARTUP_TRIES"); do
 done
 [ -n "$ready" ] || exit 0
 
-server_id=${TMUX%,*}; server_id=${server_id##*,}
+# 티커는 pane 밖에서도 뜨므로 TMUX 가 없을 수 있다. set -u 아래에서 그대로
+# 펼치면 아래의 폴백에 닿기 전에 죽는다.
+server_id=${TMUX:-}; server_id=${server_id%,*}; server_id=${server_id##*,}
 [ -n "$server_id" ] || server_id=$(tmux display-message -p '#{pid}' 2>/dev/null)
 [ -n "$server_id" ] || exit 0
 
@@ -85,7 +127,7 @@ while :; do
     base=${f##*/}
     pane="%${base#*-}"
     read -r pst pid 2>/dev/null < "$f" || continue
-    if [ -n "${pid:-}" ] && [ "$pid" != 0 ] && ! kill -0 "$pid" 2>/dev/null; then
+    if [ -n "${pid:-}" ] && [ "$pid" != 0 ] && ! pid_alive "$pid"; then
       rm -f "$f" 2>/dev/null; continue
     fi
     case "$pst" in idle|busy|waiting) state[$pane]=$pst ;; esac
