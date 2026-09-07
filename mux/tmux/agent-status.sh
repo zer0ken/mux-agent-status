@@ -14,6 +14,10 @@
 #   idle     끝났다, 사용자 차례
 #   busy     돌고 있다
 #
+# window indicator 는 창 이름 뒤에 온다. tmux 는 창 이름을 건드리지 않고도
+# 포맷에서 뒤에 이어 붙일 수 있어서, 이름을 고쳐 쓰는 psmux 와 zellij 티커와
+# 달리 automatic-rename 을 그대로 둔다. 그 자리를 티커가 직접 확보한다.
+#
 # 내보내는 것
 #   @agent_pane_state        pane 하나의 상태 (pane 옵션)
 #   @agent_clock             busy 로 있은 시간 (pane 옵션)
@@ -81,6 +85,18 @@ read_options() {
   TEXT_COLOR="${c_text:-#cdd6f4}"
 }
 
+# window indicator 를 창 이름 뒤에 놓는다. 사용자가 포맷을 다시 정하면 이어
+# 붙인 것이 사라지므로 매 틱마다 확인한다. 이미 어딘가에서 indicator 를
+# 참조하는 포맷은 사용자가 자리를 정한 것이라 건드리지 않는다.
+ensure_format() {
+  local opt cur
+  for opt in window-status-format window-status-current-format; do
+    cur=$(tmux show-options -gv "$opt" 2>/dev/null) || continue
+    case "$cur" in *@agent_window_indicator*) continue ;; esac
+    tmux set-option -g "$opt" "${cur}#{E:@agent_window_indicator}" 2>/dev/null
+  done
+}
+
 ready=""
 for _ in $(seq "$STARTUP_TRIES"); do
   if tmux list-panes -a -F '#{pane_id}' >/dev/null 2>&1; then ready=1; break; fi
@@ -105,6 +121,7 @@ shopt -s nullglob
 while :; do
   now=$EPOCHSECONDS
   read_options
+  ensure_format
   declare -A state=() started=()
 
   # ── Claude Code 세션 파일 ──────────────────────────────────
@@ -178,12 +195,11 @@ while :; do
       n=${count[$wid/$s]:-0}
       [ "$n" -gt 0 ] || continue
       if [ -n "${COUNTER_COLOR:-}" ]; then
-      ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} #[fg=$COUNTER_COLOR]$n "
-    else
-      ind+="#[fg=${COLOR[$s]}]${MARKER[$s]} $n "
-    fi
+        ind+=" #[fg=${COLOR[$s]}]${MARKER[$s]} #[fg=$COUNTER_COLOR]${n}#[fg=$TEXT_COLOR]"
+      else
+        ind+=" #[fg=${COLOR[$s]}]${MARKER[$s]} ${n}#[fg=$TEXT_COLOR]"
+      fi
     done
-    [ -n "$ind" ] && ind+="#[fg=$TEXT_COLOR]"
     [ "$ind" = "${prev_ind[$wid]:-}" ] && continue
     if [ -n "$ind" ]; then tmux set-option -w -t "$wid" @agent_window_indicator "$ind" 2>/dev/null
     else tmux set-option -w -t "$wid" -u @agent_window_indicator 2>/dev/null; fi

@@ -38,10 +38,11 @@ each have a name.
 
 The window indicator counts the panes of a window per state and lays out a
 marker and a counter for each. The order is fixed at `waiting`, `idle`, `busy`,
-and a state with no pane in it is left out.
+and a state with no pane in it is left out. It sits right after the window
+name, in every mux and on every OS.
 
 ```
- 2  ● 1 ● 2  claude
+ 2  claude ● 1 ● 2
 ```
 
 The pane indicator carries the marker for that one pane. In `busy` a clock
@@ -65,28 +66,34 @@ state and carries it into tmux options.
 run-shell "~/mux-agent-status/mux/tmux/agent-status.tmux"
 ```
 
-The entry point only writes the indicators into options. It does not rewrite
-your status bar format. Splice the indicators into the format you already use.
+The window indicator needs no further setup. The ticker appends it to
+`window-status-format` and `window-status-current-format` itself, so it lands
+after the window name whatever format is in use. A format that already
+references the indicator is left alone, which is how a different position can
+be chosen. Because tmux can reach the indicator from the format, the window
+name itself is never rewritten and `automatic-rename` keeps working.
+
+The pane indicator has no such place of its own. Splice it into the pane border
+format to use it.
 
 ```tmux
-set -g window-status-format "#I #{E:@agent_window_indicator}#W"
-set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
+set -wg pane-border-format "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
 ```
 
 psmux does not persist user-defined options at the pane or window scope, so
-this approach does not carry over. `psmux.conf` gets a separate entry point.
-`run-shell` on psmux runs the command through PowerShell rather than a POSIX
-shell, so the entry point is a `.ps1` file that launches the bash ticker as
-its own process.
+neither the format nor the pane indicator carries over. `psmux.conf` gets a
+separate entry point. `run-shell` on psmux runs the command through PowerShell
+rather than a POSIX shell, so the entry point is a `.ps1` file that launches
+the bash ticker as its own process.
 
 ```tmux
 run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"
 ```
 
-The psmux ticker skips the store-in-an-option-and-reference-it-from-a-format
-approach and instead appends the finished aggregate string directly to the
-window name. The original window name is left alone and there is no status
-bar format to splice into, so installation is the only step needed.
+The psmux ticker appends the finished aggregate string directly to the window
+name, which puts it in the same place the tmux format does. It remembers the
+original name and restores it once there is nothing left to show, and there is
+no status bar format to splice into, so installation is the only step needed.
 
 zellij draws its status bar from a plugin and offers no place in its config to
 run a command, so its ticker is started out of band. One ticker covers every
@@ -98,8 +105,8 @@ copy exits immediately, so a new shell costs nothing.
 nohup ~/mux-agent-status/mux/zellij/agent-status.sh >/dev/null 2>&1 &
 ```
 
-Like the psmux ticker it appends the finished aggregate to the tab name, so
-there is no format to splice into.
+Like the psmux ticker it appends the finished aggregate to the tab name, which
+is the same place again, so there is no format to splice into.
 
 ## pi support
 
@@ -266,14 +273,21 @@ behind reading the Claude Code state file is in
 [agents/claude](agents/claude/README.md).
 
 `mux/tmux/agent-status.sh` is the tmux ticker. It runs once a second and
-covers the two things a tmux format cannot do on its own.
+covers the three things a tmux format cannot do on its own.
 
 - Carrying the state files into pane options, read without regard to which
   session subdirectory they came from (pane_id is already server-wide unique)
 - Counting the panes of a window per state
+- Holding the window indicator's place after the window name, by appending it
+  to `window-status-format` and `window-status-current-format` when neither
+  references it yet. Checking every tick means a format set later still gets
+  it, and a format that places the indicator itself is recognised and left
+  alone. tmux resolves the indicator from the format, so the window name is
+  never rewritten
 
 `mux/psmux/agent-status.sh` is the psmux ticker. In place of options it
-appends the aggregate directly to the window name, and every place it targets
+appends the aggregate directly to the window name, which is where the tmux
+format puts it too, and every place it targets
 a window uses the full "session name:window index" form - targeting by
 `#{window_id}` or a session-less index alone would rename another session's
 window that happens to share the number. Color rides along as a tmux format
