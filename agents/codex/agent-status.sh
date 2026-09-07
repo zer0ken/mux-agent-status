@@ -5,11 +5,13 @@
 # codex 는 세션의 상태를 파일로 내보내지 않는다. Claude Code 의
 # ~/.claude/sessions/<pid>.json 에 해당하는 것이 없어서 이 스크립트가 대신 쓴다.
 # codex 는 훅을 부를 때 자기 환경을 물려주므로 mux 가 심어 둔 환경변수로 pane 을
-# 알 수 있다. 훅의 부모는 codex 프로세스라서 POSIX 에서는 PPID 가 그 세션의
-# pid 다. Windows 에서는 codex 가 네이티브 프로세스라 MSYS 가 그 부모에 1 을
-# 매기고, 그 1 은 어느 프로세스도 가리키지 않는다. codex 는 자기 pid 를 훅
-# 환경에 넣어 주지도 않는다. 그래서 부모를 확인할 수 없으면 pid 대신 0 을
-# 적는다. 소비자는 0 을 보면 생존 검사를 건너뛰고 파일을 그대로 둔다.
+# 알 수 있다.
+#
+# 파일에 적는 pid 는 세션을 가진 codex 프로세스다. 부모를 거슬러 올라가며 이름이
+# codex 인 프로세스를 찾는다. 훅의 직계 부모는 codex 가 훅을 띄울 때만 쓰고 턴이
+# 끝나면 버리는 프로세스라서, 그 pid 를 적으면 소비자가 생존 검사에서 죽은 것으로
+# 보고 파일을 지운다. 조상에서 codex 를 찾지 못하면 0 을 적고, 소비자는 0 을 보면
+# 생존 검사를 건너뛰고 파일을 그대로 둔다.
 #
 # 파일: $TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/codex-<pane>
 # 내용: "<상태> <pid>"
@@ -60,9 +62,25 @@ fi
 dir="$STATE_ROOT/$mux/$session"
 file="$dir/codex-$pane"
 
-# 부모를 확인할 수 없으면 0 을 적는다. 소비자가 0 을 생존 검사 면제로 읽는다.
-pid=$PPID
-kill -0 "$pid" 2>/dev/null || pid=0
+# 조상을 훑어 codex 를 찾는다. ps 로 묻는 것은 /proc 이 없는 POSIX(macOS 등)
+# 에서도 같은 코드가 돌기 때문이다. comm 이 경로로 오는 구현이 있어 마지막
+# 경로 요소만 본다. init(1) 에 닿거나 깊이를 넘기면 찾기를 그만둔다.
+AGENT_PROCESS=codex
+MAX_DEPTH=8
+
+pid=0
+cur=$PPID
+depth=0
+while [ "$depth" -lt "$MAX_DEPTH" ] && [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null; do
+  name=$(ps -o comm= -p "$cur" 2>/dev/null | tr -d ' 	')
+  name=${name##*/}
+  if [ "$name" = "$AGENT_PROCESS" ]; then
+    pid=$cur
+    break
+  fi
+  cur=$(ps -o ppid= -p "$cur" 2>/dev/null | tr -d ' 	')
+  depth=$((depth + 1))
+done
 
 case "${1:-}" in
   busy|idle) mkdir -p "$dir" && printf '%s %s\n' "$1" "$pid" > "$file" ;;
