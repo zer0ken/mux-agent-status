@@ -173,6 +173,13 @@ codex runs no hook it does not trust. On the first codex launch after the hooks
 are in place, codex shows a review screen. The hooks run once the user approves
 them there. Editing `hooks.json` asks for that approval again.
 
+The pid the hook writes is the codex process that owns the session, found by
+walking up the parent chain until a process named `codex` appears. The hook's
+own parent is a short-lived wrapper that codex discards as soon as the hook
+returns, so recording it would make the file look stale within a second. When
+no `codex` ancestor is found the hook writes `0`, which the consumer reads as
+exempt from the liveness check.
+
 The hook writes `<state> <pid>` to
 `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/codex-<pane>` and removes the
 file when the session ends. How the mux and session are detected, and how the
