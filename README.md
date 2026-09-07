@@ -329,6 +329,13 @@ running program set through the terminal. tmux avoids this because its pane
 indicator is a format placed around `#{pane_title}` rather than a value written
 over it. Both muxes get the window indicator's aggregate and nothing else.
 
+**tmux replaces the marker with `_` outside a UTF-8 locale.** The default
+marker is a multibyte character, and tmux substitutes one underscore per byte
+it cannot decode, so the indicator reads `_ 1`. A minimal server or container
+image often leaves `LANG` unset, which is where this shows up. Starting tmux
+under a UTF-8 locale, or with `-u`, stores the marker as written. psmux and
+zellij are unaffected.
+
 **A zellij tab name carries no color.** The tab bar is a plugin that draws the
 name as plain text, and zellij has no format escape for a tab name, so the three
 states are told apart by their glyph rather than by color.
