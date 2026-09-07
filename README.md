@@ -99,7 +99,7 @@ pi install git:github.com/zer0ken/mux-agent-status
 
 The extension detects the mux and session from the pi process's own
 environment, then writes `<state> <pid>` to
-`$TMPDIR/mux-agent-status-<uid>/<mux>/<session>/pi-<pane>` on every state
+`$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/pi-<pane>` on every state
 change and removes the file when the session ends. How the mux and session
 are detected, and how the pane is spelled, is in
 [How it works](#how-it-works). It uses the same three state names as the rest
@@ -135,7 +135,7 @@ are in place, codex shows a review screen. The hooks run once the user approves
 them there.
 
 The hook writes `<state> <pid>` to
-`$TMPDIR/mux-agent-status-<uid>/<mux>/<session>/codex-<pane>` and removes the
+`$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/codex-<pane>` and removes the
 file when the session ends. How the mux and session are detected, and how the
 pane is spelled, is in [How it works](#how-it-works). It uses the same state
 names as the rest of mux-agent-status, so nothing is translated in between.
@@ -185,8 +185,8 @@ neither path.
 | Agent | State file |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/mux-agent-status-<uid>/<mux>/<session>/codex-<pane>` |
-| pi | `$TMPDIR/mux-agent-status-<uid>/<mux>/<session>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/pi-<pane>` |
 
 The codex hook and the pi extension detect the mux from their own process
 environment. `TMUX_PANE` present means tmux, and the pane is spelled with its
@@ -227,6 +227,13 @@ though commands that print the name back as text show it unevaluated.
 Both tickers write only to targets whose value changed. One ticker runs per
 server and ends when that server ends.
 
+A state file whose agent crashed without removing it is dropped by the ticker,
+which reads the pid the file carries and checks whether that process is still
+running. On Windows this takes two steps: `kill -0` recognizes only the pids
+the shell itself hands out, and the pi extension records the pid Node reports,
+which is the native Windows one, so the ticker falls back to the native process
+list for pids the shell does not know.
+
 ## Layout
 
 The directories split code that knows a mux from code that knows an agent.
@@ -241,9 +248,16 @@ Adding a mux or an agent then touches one place.
 | `agents/pi` | The pi extension |
 
 An agent leaves its state in
-`$TMPDIR/mux-agent-status-<uid>/<mux>/<session>/<agent>-<pane>`, and each mux
+`$TMPDIR/mux-agent-status[-<uid>]/<mux>/<session>/<agent>-<pane>`, and each mux
 consumer reads only under its own named subdirectory. That path and the three
 state names are the whole contract between the two sides.
+
+The `-<uid>` part is present only where the temp directory is shared between
+users, which is POSIX. Windows gives each user their own temp directory, so
+there is nothing to separate and the segment is left out. Both sides decide
+this from the OS rather than from a uid value, because Node does not offer
+`process.getuid` on Windows and so the pi extension cannot produce the number
+that `id -u` gives the shell.
 
 ## Limitations
 

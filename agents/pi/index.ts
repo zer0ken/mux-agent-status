@@ -5,7 +5,7 @@
  * pi 는 실행 중인 세션의 목록도, 상태 파일도 내보내지 않는다. Claude Code 의
  * ~/.claude/sessions/<pid>.json 에 해당하는 것이 없어서 이 확장이 대신 쓴다.
  *
- * 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/pi-<pane>
+ * 파일: $TMPDIR/mux-agent-status[-<uid>]/<mux>/<세션>/pi-<pane>
  * 내용: "<상태> <pid>"
  *
  * mux 는 pi 프로세스 환경에서 판별한다. tmux 와 그 별칭(psmux 포함)은
@@ -57,8 +57,14 @@ export default function (pi: ExtensionAPI) {
   }
   if (!session) return;
 
-  const uid = typeof process.getuid === "function" ? process.getuid() : 0;
-  const dir = `${process.env.TMPDIR ?? tmpdir()}/mux-agent-status-${uid}/${mux}/${session}`;
+  // Windows 의 임시 디렉터리는 이미 사용자마다 갈라져 있어 경로에 uid 를 넣지
+  // 않는다. POSIX 는 /tmp 를 공용으로 쓰므로 uid 로 갈라 둔다. 소비자가 bash 에서
+  // 같은 판단을 하므로 양쪽 경로가 맞는다. Node 는 Windows 에서 process.getuid 를
+  // 제공하지 않아, uid 를 그대로 쓰면 소비자가 읽는 경로와 어긋난다.
+  const root = process.platform === "win32"
+    ? "mux-agent-status"
+    : `mux-agent-status-${process.getuid?.() ?? 0}`;
+  const dir = `${process.env.TMPDIR ?? tmpdir()}/${root}/${mux}/${session}`;
   const file = `${dir}/pi-${pane}`;
 
   let state: State = "idle";
