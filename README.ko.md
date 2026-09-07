@@ -35,10 +35,10 @@ mux-agent-status 가 내보내는 indicator 는 두 가지다. window indicator 
 
 window indicator 는 창에 속한 pane 을 상태별로 세어 marker 와 counter 를 짝지어
 늘어놓는다. 순서는 `waiting`, `idle`, `busy` 로 고정이고, 한 개도 없는 상태는
-빠진다.
+빠진다. 자리는 창 이름 바로 뒤이며, 어느 mux 에서든 어느 OS 에서든 같다.
 
 ```
- 2  ● 1 ● 2  claude
+ 2  claude ● 1 ● 2
 ```
 
 pane indicator 는 그 pane 하나의 marker 를 보여준다. 상태가 `busy` 이면 marker
@@ -61,26 +61,31 @@ tmux.conf 에 진입점을 부르는 한 줄을 넣는다. 진입점은 옵션�
 run-shell "~/mux-agent-status/mux/tmux/agent-status.tmux"
 ```
 
-진입점은 indicator 를 옵션에 넣어 둘 뿐 상태바 포맷을 대신 고치지 않는다.
-사용자가 쓰던 포맷에 indicator 를 직접 끼워 넣는다.
+window indicator 는 더 손볼 것이 없다. 티커가 `window-status-format` 과
+`window-status-current-format` 에 스스로 이어 붙여서, 어떤 포맷을 쓰고 있든
+창 이름 뒤에 놓인다. 이미 indicator 를 참조하는 포맷은 사용자가 자리를 정한
+것으로 보고 건드리지 않으므로, 다른 자리에 놓고 싶으면 그렇게 하면 된다.
+tmux 는 포맷에서 indicator 에 닿을 수 있어서 창 이름 자체는 고쳐 쓰지 않고,
+`automatic-rename` 도 그대로 돈다.
+
+pane indicator 는 그런 제자리가 없다. 쓰려면 pane 경계 포맷에 끼워 넣는다.
 
 ```tmux
-set -g window-status-format "#I #{E:@agent_window_indicator}#W"
-set -wg pane-border-format  "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
+set -wg pane-border-format "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
 ```
 
-psmux 는 사용자 정의 옵션의 pane 과 창 스코프를 저장하지 않아 이 방식을
-그대로 쓸 수 없다. `psmux.conf` 에는 별도 진입점을 넣는다. psmux 의
-`run-shell` 은 명령을 POSIX 셸이 아니라 PowerShell 로 돌리므로, 진입점은
-bash 티커를 별도 프로세스로 띄우는 `.ps1` 파일이다.
+psmux 는 사용자 정의 옵션의 pane 과 창 스코프를 저장하지 않아 포맷도 pane
+indicator 도 그대로 쓸 수 없다. `psmux.conf` 에는 별도 진입점을 넣는다.
+psmux 의 `run-shell` 은 명령을 POSIX 셸이 아니라 PowerShell 로 돌리므로,
+진입점은 bash 티커를 별도 프로세스로 띄우는 `.ps1` 파일이다.
 
 ```tmux
 run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"
 ```
 
-psmux 쪽 티커는 옵션에 넣어 두고 참조하는 대신, 완성된 집계 문자열을 창
-이름 뒤에 직접 붙인다. 원래 창 이름은 그대로 두고 상태바 포맷을 고칠 자리도
-없어서, 설치 외에 추가로 손볼 곳이 없다.
+psmux 쪽 티커는 완성된 집계 문자열을 창 이름 뒤에 직접 붙여, tmux 포맷이
+놓는 자리와 같은 곳에 둔다. 원래 이름은 기억해 두고 보여줄 것이 없어지면
+되돌린다. 상태바 포맷을 고칠 자리도 없어서, 설치 외에 추가로 손볼 곳이 없다.
 
 zellij 는 상태바를 플러그인으로 그리고 설정에서 명령을 돌릴 자리가 없어서, 그
 티커는 세션 밖에서 띄운다. 티커가 세션 목록을 스스로 훑기 때문에 티커 하나가
@@ -91,7 +96,8 @@ zellij 는 상태바를 플러그인으로 그리고 설정에서 명령을 돌�
 nohup ~/mux-agent-status/mux/zellij/agent-status.sh >/dev/null 2>&1 &
 ```
 
-psmux 쪽과 같이 완성된 집계를 탭 이름 뒤에 붙이므로 고칠 포맷이 없다.
+psmux 쪽과 같이 완성된 집계를 탭 이름 뒤에, 즉 또 같은 자리에 붙이므로 고칠
+포맷이 없다.
 
 ## pi 연동
 
@@ -246,14 +252,20 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 에 있다.
 
 `mux/tmux/agent-status.sh` 가 tmux 의 티커다. 1초마다 돌면서 tmux 포맷만으로는
-할 수 없는 두 가지를 맡는다.
+할 수 없는 세 가지를 맡는다.
 
 - 상태 파일을 세션 구분 없이 읽어 pane 옵션으로 옮긴다(pane_id 가 서버 전체
   고유라 어느 세션 아래 있었는지는 상관없다)
 - 창에 속한 pane 을 상태별로 센다
+- window indicator 의 자리를 창 이름 뒤에 확보한다. 아직 indicator 를
+  참조하지 않는 `window-status-format` 과 `window-status-current-format` 에
+  이어 붙인다. 매 틱마다 확인하므로 나중에 정한 포맷에도 붙고, indicator 를
+  스스로 배치한 포맷은 그것을 알아보고 건드리지 않는다. tmux 는 포맷에서
+  indicator 를 풀어내므로 창 이름 자체는 고쳐 쓰지 않는다
 
 `mux/psmux/agent-status.sh` 가 psmux 의 티커다. 옵션을 못 쓰는 대신 창
-이름 자체에 집계를 붙이고, 창을 가리킬 때마다 "세션 이름:창 인덱스" 형태의
+이름 자체에 집계를 붙인다. tmux 포맷이 놓는 자리와 같은 곳이다. 창을
+가리킬 때마다 "세션 이름:창 인덱스" 형태의
 정규 타겟만 쓴다. `#{window_id}` 나 세션 없는 인덱스만으로 창을 가리키면
 같은 번호를 쓰는 다른 세션의 창이 바뀔 수 있어서다. 색은 창 이름 문자열
 안에 tmux 포맷 이스케이프(`#[fg=...]`)로 얹혀 함께 저장된다. 화면에 창
