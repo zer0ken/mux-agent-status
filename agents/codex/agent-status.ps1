@@ -54,24 +54,35 @@ $root = if ($env:TMPDIR) { $env:TMPDIR } else { $env:TEMP }
 $dir = Join-Path (Join-Path (Join-Path $root 'mux-agent-status') $mux) $session
 $file = Join-Path $dir "codex-$pane"
 
-# 훅을 띄운 프로세스가 codex 다. 그 pid 는 Windows 네이티브 pid 라서 소비자가
-# 프로세스 목록으로 확인할 수 있다. 부모를 못 찾으면 0 을 적는다. 소비자는 0 을
-# 보면 생존 검사를 건너뛰고 파일을 그대로 둔다.
-$parent = 0
-try {
-    $p = (Get-Process -Id $PID).Parent
-    if ($p) { $parent = $p.Id }
-} catch { }
-if (-not $parent) {
-    $ppid = (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
-    if ($ppid) { $parent = $ppid }
+# 조상을 훑어 codex 프로세스를 찾고 그 pid 를 적는다. codex 는 훅을 바로
+# 띄우지 않고 중간 프로세스를 하나 더 두므로, 부모 pid 는 훅이 끝나면 함께
+# 사라지는 껍데기다. 그것을 적으면 소비자가 죽은 pid 로 보고 살아 있는 세션의
+# 상태 파일을 지운다. codex 의 pid 는 세션이 사는 내내 그대로이고 Windows
+# 네이티브 pid 라서 소비자가 프로세스 목록으로 확인할 수 있다.
+#
+# codex 를 못 찾으면 0 을 적는다. 소비자는 0 을 보면 생존 검사를 건너뛰고
+# 파일을 그대로 둔다. 짐작한 pid 를 적는 것보다 검사를 건너뛰는 것이 낫다.
+$AGENT_PROCESS = 'codex'
+$MAX_DEPTH = 8
+
+$owner = 0
+$cur = $PID
+for ($depth = 0; $depth -lt $MAX_DEPTH; $depth++) {
+    $info = Get-CimInstance Win32_Process -Filter "ProcessId=$cur" -ErrorAction SilentlyContinue
+    if (-not $info) { break }
+    if ([System.IO.Path]::GetFileNameWithoutExtension($info.Name) -eq $AGENT_PROCESS) {
+        $owner = $info.ProcessId
+        break
+    }
+    if (-not $info.ParentProcessId -or $info.ParentProcessId -eq 0) { break }
+    $cur = $info.ParentProcessId
 }
 
 switch ($State) {
     'remove' { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
     { $_ -in 'busy', 'idle' } {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        [System.IO.File]::WriteAllText($file, "$State $parent`n")
+        [System.IO.File]::WriteAllText($file, "$State $owner`n")
     }
 }
 
