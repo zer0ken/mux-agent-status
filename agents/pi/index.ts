@@ -5,13 +5,19 @@
  * pi 는 실행 중인 세션의 목록도, 상태 파일도 내보내지 않는다. Claude Code 의
  * ~/.claude/sessions/<pid>.json 에 해당하는 것이 없어서 이 확장이 대신 쓴다.
  *
- * 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>
+ * 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/<세션>/pi-<pane>
  * 내용: "<상태> <pid>"
  *
  * mux 는 pi 프로세스 환경에서 판별한다. tmux 와 그 별칭(psmux 포함)은
  * TMUX_PANE 을, zellij 는 ZELLIJ_PANE_ID 를 심어 두므로 어느 것이 있는지로
  * 정하고, pane id 표기는 그 mux 가 원래 쓰는 그대로 남긴다(tmux 계열은 %
  * 를 뗀 숫자, zellij 는 ZELLIJ_PANE_ID 값 그대로).
+ *
+ * psmux 는 window_id 와 pane_id 를 세션마다 따로 채번해서, 서로 다른
+ * 세션이 같은 pane 번호를 가질 수 있다. 세션 이름까지 넣어야 그 둘을
+ * 가른다. tmux 는 pane_id 가 이미 서버 전체 고유라 세션 서브디렉터리가
+ * 없어도 됐지만, 모든 mux 에 공통으로 두면 소비자 쪽 코드가 mux 마다
+ * 갈리지 않는다.
  *
  * 상태는 소비자가 읽는 어휘를 그대로 쓴다.
  *   idle     사용자 입력을 기다린다
@@ -21,6 +27,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { writeFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 
 type State = "idle" | "busy" | "waiting";
 
@@ -32,18 +39,26 @@ export default function (pi: ExtensionAPI) {
   const zellijPaneId = process.env.ZELLIJ_PANE_ID;
   let mux: string;
   let pane: string;
+  let session: string;
   if (tmuxPane) {
     mux = "tmux";
     pane = tmuxPane.replace("%", "");
-  } else if (zellijPaneId) {
+    try {
+      session = execFileSync("tmux", ["display-message", "-t", tmuxPane, "-p", "#S"], { encoding: "utf8" }).trim();
+    } catch {
+      return;   // 세션을 모르면 다른 세션의 pane 과 가를 수 없다
+    }
+  } else if (zellijPaneId && process.env.ZELLIJ_SESSION_NAME) {
     mux = "zellij";
     pane = zellijPaneId;
+    session = process.env.ZELLIJ_SESSION_NAME;
   } else {
     return;   // 알려진 mux 밖에서는 표시할 곳이 없다
   }
+  if (!session) return;
 
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
-  const dir = `${process.env.TMPDIR ?? tmpdir()}/mux-agent-status-${uid}/${mux}`;
+  const dir = `${process.env.TMPDIR ?? tmpdir()}/mux-agent-status-${uid}/${mux}/${session}`;
   const file = `${dir}/pi-${pane}`;
 
   let state: State = "idle";
