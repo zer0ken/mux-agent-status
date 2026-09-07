@@ -2,9 +2,10 @@
 
 [한국어](README.ko.md)
 
-mux-agent-status shows the state of your Claude Code, codex and pi sessions in the
-tmux and psmux status bar. With several windows open, you can see which one is
-waiting on you and which one is still running without switching to it.
+mux-agent-status shows the state of your Claude Code, codex and pi sessions in
+the tmux, psmux and zellij status bar. With several windows open, you can see
+which one is waiting on you and which one is still running without switching to
+it.
 
 ## States
 
@@ -86,6 +87,19 @@ The psmux ticker skips the store-in-an-option-and-reference-it-from-a-format
 approach and instead appends the finished aggregate string directly to the
 window name. The original window name is left alone and there is no status
 bar format to splice into, so installation is the only step needed.
+
+zellij draws its status bar from a plugin and offers no place in its config to
+run a command, so its ticker is started out of band. One ticker covers every
+zellij session on the machine, because it lists the sessions itself rather than
+being launched by one. Starting it from a shell profile is enough; a second
+copy exits immediately, so a new shell costs nothing.
+
+```bash
+nohup ~/mux-agent-status/mux/zellij/agent-status.sh >/dev/null 2>&1 &
+```
+
+Like the psmux ticker it appends the finished aggregate to the tab name, so
+there is no format to splice into.
 
 ## pi support
 
@@ -175,6 +189,17 @@ them earlier in the shell that starts psmux.
 | `COLOR_BUSY` | `red` | Color of the `busy` marker and counter |
 | `COLOR_TEXT` | `default` | Color of the window name that follows the indicator |
 
+zellij reads the same marker variables and no color variable. Its tab bar is a
+plugin that draws the tab name as plain text, with no format escape to carry a
+color, so the markers default to a different glyph per state instead of one
+glyph in three colors.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `MARKER_WAITING` | `?` | Marker for `waiting` |
+| `MARKER_IDLE` | `✓` | Marker for `idle` |
+| `MARKER_BUSY` | `↻` | Marker for `busy` |
+
 ## How it works
 
 The state comes from what each agent records about itself. Claude Code writes
@@ -224,8 +249,18 @@ escape (`#[fg=...]`) embedded in the window name string itself; psmux
 interprets that escape when it renders the window name to the screen, even
 though commands that print the name back as text show it unevaluated.
 
-Both tickers write only to targets whose value changed. One ticker runs per
-server and ends when that server ends.
+`mux/zellij/agent-status.sh` is the zellij ticker. It appends the aggregate to
+the tab name through `rename-tab-by-id`, the one command that names a tab
+without moving focus. Panes are mapped to tabs by asking zellij for its pane
+list; terminal and plugin panes are numbered separately and can share a number,
+so only terminal panes are matched against the state files. Unlike the other
+two, this ticker is not launched by a server: it lists the sessions itself and
+covers every zellij session on the machine, and it asks a session for its panes
+only while that session has an agent or still carries an aggregate to remove.
+
+Every ticker writes only to targets whose value changed. The tmux and psmux
+tickers run one per server and end when that server ends; the zellij ticker runs
+one per machine.
 
 A state file whose agent crashed without removing it is dropped by the ticker,
 which reads the pid the file carries and checks whether that process is still
@@ -243,6 +278,7 @@ Adding a mux or an agent then touches one place.
 | --- | --- |
 | `mux/tmux` | The tmux entry point and ticker, which carry state files into tmux options |
 | `mux/psmux` | The psmux entry point and ticker, which carry state files into window names |
+| `mux/zellij` | The zellij ticker, which carries state files into tab names |
 | `agents/claude` | A document on the principle behind reading the Claude Code state file |
 | `agents/codex` | The script the codex hooks call |
 | `agents/pi` | The pi extension |
@@ -284,11 +320,18 @@ one. Claude Code writes that file itself, so this is not something this
 repository can fix. codex and pi still appear under zellij, because the hook
 and the extension this repository ships cover both muxes themselves.
 
-**psmux cannot render a pane-level indicator.** psmux does not persist
-user-defined options at the pane or window scope, so the pane indicator
-approach `mux/tmux` uses (marker and clock riding the pane border) has
-nothing to work from on psmux. `mux/psmux` only appends the equivalent of the
-window indicator's aggregate to the window name.
+**Neither psmux nor zellij renders a pane-level indicator.** psmux does not
+persist user-defined options at the pane or window scope, so the approach
+`mux/tmux` uses - a marker and clock riding the pane border - has nothing to
+work from there. On zellij a pane can be targeted by id, but the only
+pane-level text surface is the pane name, and writing it replaces the title the
+running program set through the terminal. tmux avoids this because its pane
+indicator is a format placed around `#{pane_title}` rather than a value written
+over it. Both muxes get the window indicator's aggregate and nothing else.
+
+**A zellij tab name carries no color.** The tab bar is a plugin that draws the
+name as plain text, and zellij has no format escape for a tab name, so the three
+states are told apart by their glyph rather than by color.
 
 **A psmux session name goes straight into the state file path.** A `/` in the
 session name would break it. Neither tmux nor psmux ordinarily allow a `/` in
@@ -302,7 +345,7 @@ typed by hand once.
 
 ## Requirements
 
-- tmux 3.2 or newer, or psmux with PowerShell on the PATH
+- tmux 3.2 or newer, psmux with PowerShell on the PATH, or zellij 0.45 or newer
 - bash 5.0 or newer
 - Claude Code 2.1 or newer
 - codex 0.152 or newer
