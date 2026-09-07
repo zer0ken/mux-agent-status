@@ -82,17 +82,20 @@ extension with pi; no other package is needed.
 pi install git:github.com/zer0ken/mux-agent-status
 ```
 
-The extension writes `<state> <pid>` to
-`$TMPDIR/mux-agent-status-<uid>/pi-<pane>` on every state change and removes
-the file when the session ends. It uses the same three state names as the rest
-of mux-agent-status, so nothing is translated in between.
+The extension detects the mux from the pi process's own environment, then
+writes `<state> <pid>` to
+`$TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>` on every state change and
+removes the file when the session ends. How the mux is detected and how the
+pane is spelled is in [How it works](#how-it-works). It uses the same three
+state names as the rest of mux-agent-status, so nothing is translated in
+between.
 
 ## codex support
 
 codex writes a record file per session, but that file carries no pane. Nothing
 in it ties a session to a pane, so this repository ships a hook script that
 records the state instead. codex passes its own environment to a hook, so the
-script reads the pane from `TMUX_PANE`.
+script reads the mux and the pane from that environment.
 
 Put three hooks in `~/.codex/hooks.json`.
 
@@ -117,9 +120,10 @@ are in place, codex shows a review screen. The hooks run once the user approves
 them there.
 
 The hook writes `<state> <pid>` to
-`$TMPDIR/mux-agent-status-<uid>/codex-<pane>` and removes the file when the
-session ends. It uses the same state names as the rest of mux-agent-status, so
-nothing is translated in between.
+`$TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>` and removes the file when
+the session ends. How the mux is detected and how the pane is spelled is in
+[How it works](#how-it-works). It uses the same state names as the rest of
+mux-agent-status, so nothing is translated in between.
 
 ## Options
 
@@ -150,8 +154,15 @@ neither path.
 | Agent | State file |
 | --- | --- |
 | Claude Code | `~/.claude/sessions/<pid>.json` |
-| codex | `$TMPDIR/mux-agent-status-<uid>/codex-<pane>` |
-| pi | `$TMPDIR/mux-agent-status-<uid>/pi-<pane>` |
+| codex | `$TMPDIR/mux-agent-status-<uid>/<mux>/codex-<pane>` |
+| pi | `$TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>` |
+
+The codex hook and the pi extension detect the mux from their own process
+environment. `TMUX_PANE` present means tmux, and the pane is spelled with its
+leading `%` stripped. psmux is an alias of the tmux CLI and passes `TMUX_PANE`
+through unchanged, so it shares the same `tmux` subdirectory. `ZELLIJ_PANE_ID`
+present means zellij, and the pane is spelled exactly as that value. Neither
+present means there is nowhere to show the state, so nothing is written.
 
 How each agent records its state lives under `agents/<agent>/`. The principle
 behind reading the Claude Code state file is in
@@ -179,9 +190,9 @@ Adding a mux or an agent then touches one place.
 | `agents/pi` | The pi extension |
 
 An agent leaves its state in
-`$TMPDIR/mux-agent-status-<uid>/<agent>-<pane>` and a mux reads only that
-directory. That path and the three state names are the whole contract between
-the two sides.
+`$TMPDIR/mux-agent-status-<uid>/<mux>/<agent>-<pane>`, and each mux consumer
+reads only its own named subdirectory. That path and the three state names are
+the whole contract between the two sides.
 
 ## Limitations
 
@@ -201,6 +212,12 @@ so pointing the ticker at that command brings them back. That call costs about
 command the turn has not ended, so the `Stop` hook does not fire. The pane stays
 on the red `busy` dot for as long as it is the user's move. The three hooks
 above cannot tell that an approval prompt is on screen.
+
+**Claude Code sessions do not appear under zellij.** Claude Code's own session
+file fills the `tmux` field only for a tmux or psmux pane, never for a zellij
+one. Claude Code writes that file itself, so this is not something this
+repository can fix. codex and pi still appear under zellij, because the hook
+and the extension this repository ships cover both muxes themselves.
 
 ## Requirements
 

@@ -1,14 +1,19 @@
 /**
- * pi 세션의 상태를 파일 하나에 쓴다. mux-agent-status 의 티커가 그 파일을 읽어
- * tmux 상태바에 표시한다.
+ * pi 세션의 상태를 파일 하나에 쓴다. mux-agent-status 의 소비자가 그 파일을 읽어
+ * 각자의 상태바에 표시한다.
  *
  * pi 는 실행 중인 세션의 목록도, 상태 파일도 내보내지 않는다. Claude Code 의
  * ~/.claude/sessions/<pid>.json 에 해당하는 것이 없어서 이 확장이 대신 쓴다.
  *
- * 파일: $TMPDIR/mux-agent-status-<uid>/pi-<pane>
+ * 파일: $TMPDIR/mux-agent-status-<uid>/<mux>/pi-<pane>
  * 내용: "<상태> <pid>"
  *
- * 상태는 티커가 쓰는 어휘를 그대로 쓴다.
+ * mux 는 pi 프로세스 환경에서 판별한다. tmux 와 그 별칭(psmux 포함)은
+ * TMUX_PANE 을, zellij 는 ZELLIJ_PANE_ID 를 심어 두므로 어느 것이 있는지로
+ * 정하고, pane id 표기는 그 mux 가 원래 쓰는 그대로 남긴다(tmux 계열은 %
+ * 를 뗀 숫자, zellij 는 ZELLIJ_PANE_ID 값 그대로).
+ *
+ * 상태는 소비자가 읽는 어휘를 그대로 쓴다.
  *   idle     사용자 입력을 기다린다
  *   busy     돌고 있다
  *   waiting  대화형 툴이 답을 기다린다
@@ -23,12 +28,23 @@ type State = "idle" | "busy" | "waiting";
 const INTERACTIVE_TOOLS = new Set(["ask_user_question"]);
 
 export default function (pi: ExtensionAPI) {
-  const pane = process.env.TMUX_PANE;
-  if (!pane) return;   // tmux 밖에서는 표시할 곳이 없다
+  const tmuxPane = process.env.TMUX_PANE;
+  const zellijPaneId = process.env.ZELLIJ_PANE_ID;
+  let mux: string;
+  let pane: string;
+  if (tmuxPane) {
+    mux = "tmux";
+    pane = tmuxPane.replace("%", "");
+  } else if (zellijPaneId) {
+    mux = "zellij";
+    pane = zellijPaneId;
+  } else {
+    return;   // 알려진 mux 밖에서는 표시할 곳이 없다
+  }
 
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
-  const dir = `${process.env.TMPDIR ?? tmpdir()}/mux-agent-status-${uid}`;
-  const file = `${dir}/pi-${pane.replace("%", "")}`;
+  const dir = `${process.env.TMPDIR ?? tmpdir()}/mux-agent-status-${uid}/${mux}`;
+  const file = `${dir}/pi-${pane}`;
 
   let state: State = "idle";
   let interactive = 0;
