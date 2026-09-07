@@ -2,8 +2,8 @@
 
 [English](README.md)
 
-mux-agent-status 는 tmux 와 psmux 의 상태바에 Claude Code, codex, pi 세션의
-상태를 표시한다. 창을 여러 개 열어 두었을 때 어느 창이 입력을 기다리는지,
+mux-agent-status 는 tmux 와 psmux 와 zellij 의 상태바에 Claude Code, codex, pi
+세션의 상태를 표시한다. 창을 여러 개 열어 두었을 때 어느 창이 입력을 기다리는지,
 어느 창이 아직 돌고 있는지를 창을 옮기지 않고 알 수 있다.
 
 ## 상태 구분
@@ -81,6 +81,17 @@ run-shell "~/mux-agent-status/mux/psmux/agent-status.ps1"
 psmux 쪽 티커는 옵션에 넣어 두고 참조하는 대신, 완성된 집계 문자열을 창
 이름 뒤에 직접 붙인다. 원래 창 이름은 그대로 두고 상태바 포맷을 고칠 자리도
 없어서, 설치 외에 추가로 손볼 곳이 없다.
+
+zellij 는 상태바를 플러그인으로 그리고 설정에서 명령을 돌릴 자리가 없어서, 그
+티커는 세션 밖에서 띄운다. 티커가 세션 목록을 스스로 훑기 때문에 티커 하나가
+그 기계의 zellij 세션을 모두 맡는다. 셸 프로필에 한 줄 넣어 두면 된다. 두
+번째로 뜬 것은 바로 끝나므로 셸을 새로 열어도 값이 들지 않는다.
+
+```bash
+nohup ~/mux-agent-status/mux/zellij/agent-status.sh >/dev/null 2>&1 &
+```
+
+psmux 쪽과 같이 완성된 집계를 탭 이름 뒤에 붙이므로 고칠 포맷이 없다.
 
 ## pi 연동
 
@@ -163,6 +174,16 @@ psmux 는 이 값들을 옵션으로 저장하지 못해서, `mux/psmux/agent-st
 | `COLOR_BUSY` | `red` | `busy` marker 와 counter 의 색 |
 | `COLOR_TEXT` | `default` | indicator 뒤에 오는 창 이름의 색 |
 
+zellij 는 marker 변수만 같은 이름으로 읽고 색 변수는 읽지 않는다. 탭 바가
+플러그인이고 탭 이름을 글자로만 그려서 색을 실을 포맷 이스케이프가 없다. 그래서
+한 글리프를 세 색으로 가르는 대신 상태마다 다른 글리프를 기본값으로 쓴다.
+
+| 변수 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `MARKER_WAITING` | `?` | `waiting` 의 marker |
+| `MARKER_IDLE` | `✓` | `idle` 의 marker |
+| `MARKER_BUSY` | `↻` | `busy` 의 marker |
+
 ## 동작 원리
 
 상태는 에이전트가 스스로 기록한 것을 읽는다. Claude Code 는 세션 파일을 직접
@@ -208,8 +229,16 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 이름을 그릴 때는 psmux 가 이 이스케이프를 해석해 색으로 보여주지만, 이름을
 글자 그대로 돌려주는 명령에는 이스케이프가 그대로 찍힌다.
 
-두 티커 모두 값이 바뀐 대상에만 쓰고, 서버마다 하나만 돌고 서버가 끝나면
-함께 끝난다.
+`mux/zellij/agent-status.sh` 가 zellij 의 티커다. 집계를 `rename-tab-by-id` 로
+탭 이름에 붙인다. 포커스를 옮기지 않고 탭에 이름을 주는 명령이 그것뿐이다.
+pane 이 어느 탭에 속하는지는 zellij 에 pane 목록을 물어 얻는다. 터미널 pane 과
+플러그인 pane 은 번호를 따로 매겨 같은 번호가 겹칠 수 있어서, 상태 파일과 맞출
+때 터미널 pane 만 고른다. 앞의 두 티커와 달리 이 티커는 서버가 띄워 주지 않는다.
+세션 목록을 스스로 훑어 그 기계의 zellij 세션을 모두 맡고, 에이전트가 있거나 떼야
+할 집계가 남은 세션에만 pane 을 물어본다.
+
+세 티커 모두 값이 바뀐 대상에만 쓴다. tmux 와 psmux 의 티커는 서버마다 하나씩
+돌고 서버가 끝나면 함께 끝나며, zellij 의 티커는 기계마다 하나가 돈다.
 
 에이전트가 상태 파일을 지우지 못하고 죽으면 티커가 그 파일을 치운다. 파일에
 적힌 pid 로 그 프로세스가 아직 도는지 보고 판단한다. Windows 에서는 이 판단이
@@ -226,6 +255,7 @@ Claude Code 의 상태 파일을 읽는 원리는 [agents/claude](agents/claude/
 | --- | --- |
 | `mux/tmux` | tmux 진입점과 티커. 상태 파일을 읽어 tmux 옵션으로 옮긴다 |
 | `mux/psmux` | psmux 진입점과 티커. 상태 파일을 읽어 창 이름에 집계를 붙인다 |
+| `mux/zellij` | zellij 티커. 상태 파일을 읽어 탭 이름에 집계를 붙인다 |
 | `agents/claude` | Claude Code 의 상태 파일을 읽는 원리를 적은 문서 |
 | `agents/codex` | codex 훅이 부르는 스크립트 |
 | `agents/pi` | pi 확장 |
@@ -264,11 +294,17 @@ Claude 세션의 indicator 만 사라지고 codex 와 pi 세션은 그대로 동
 값이 아니다. codex 와 pi 는 이 저장소가 담은 훅과 확장이 두 mux 를 모두
 가리므로 zellij 에서도 그대로 나온다.
 
-**psmux 에서는 pane 단위 indicator 를 못 그린다.** psmux 는 pane 과 창
-스코프의 사용자 정의 옵션을 저장하지 않아서, `mux/tmux` 가 쓰는 pane
-indicator(marker 와 clock 을 pane border 에 얹는 것) 방식을 psmux 에는
-쓸 수 없다. `mux/psmux` 는 window indicator 에 해당하는 집계만 창 이름에
-붙인다.
+**psmux 와 zellij 에서는 pane 단위 indicator 를 그리지 않는다.** psmux 는 pane 과
+창 스코프의 사용자 정의 옵션을 저장하지 않아서, `mux/tmux` 가 쓰는 방식, 곧 marker
+와 clock 을 pane border 에 얹는 것을 psmux 에는 쓸 수 없다. zellij 는 pane 을 id 로
+지정할 수 있지만, pane 단위로 글자를 넣을 자리가 pane 이름뿐이고 그 이름을 쓰면
+프로그램이 터미널로 넣어 둔 제목을 덮어쓴다. tmux 는 pane indicator 를
+`#{pane_title}` 을 감싸는 포맷으로 두고 값을 덮어쓰지 않아서 이 문제가 없다. 두
+mux 는 window indicator 에 해당하는 집계만 받는다.
+
+**zellij 의 탭 이름에는 색이 실리지 않는다.** 탭 바가 플러그인이고 이름을 글자로만
+그리는데 탭 이름에 쓸 포맷 이스케이프가 zellij 에 없다. 그래서 세 상태를 색이 아니라
+글리프로 가른다.
 
 **psmux 의 세션 이름은 경로에 그대로 들어간다.** 세션 이름에 `/` 가 있으면
 상태 파일 경로가 어긋난다. tmux 와 psmux 모두 세션 이름에 `/` 를 허용하지
@@ -283,7 +319,7 @@ indicator(marker 와 clock 을 pane border 에 얹는 것) 방식을 psmux 에�
 
 ## 요구 사항
 
-- tmux 3.2 이상, 또는 PowerShell 이 PATH 에 있는 psmux
+- tmux 3.2 이상, PowerShell 이 PATH 에 있는 psmux, 또는 zellij 0.45 이상
 - bash 5.0 이상
 - Claude Code 2.1 이상
 - codex 0.152 이상
