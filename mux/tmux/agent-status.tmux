@@ -23,23 +23,52 @@ tmux set -ogq @agent_marker_waiting "$base"
 tmux set -ogq @agent_marker_idle    "$base"
 tmux set -ogq @agent_marker_busy    "$base"
 
+# window 와 pane 은 marker 기본값을 따로 가진다. 새 공통값이 없으면 기존
+# 상태별 marker 를 이어받으므로 기존 설정도 같은 모양을 유지한다. 명시한 빈
+# 문자열도 값으로 취급한다.
+if tmux show-option -gv @agent_window_marker >/dev/null 2>&1; then
+  window_default='#{@agent_window_marker}'
+else
+  window_default=
+fi
+if tmux show-option -gv @agent_pane_marker >/dev/null 2>&1; then
+  pane_default='#{@agent_pane_marker}'
+else
+  pane_default=
+fi
+
+for st in waiting idle busy; do
+  if [ -n "$window_default" ]; then marker_default=$window_default
+  else marker_default="#{@agent_marker_$st}"; fi
+  tmux set -ogq "@agent_window_marker_$st" "$marker_default"
+
+  if [ -n "$pane_default" ]; then marker_default=$pane_default
+  else marker_default="#{@agent_marker_$st}"; fi
+  tmux set -ogq "@agent_pane_marker_$st" "$marker_default"
+done
+
+tmux set -ogq @agent_window_format "default"
+
 # counter 와 clock 은 색을 비워 두면 자기 marker 의 색을 따른다.
 tmux set -ogq @agent_counter_color ""
 tmux set -ogq @agent_clock_color   ""
 
 # pane indicator. pane-border-format 에 끼워 쓴다. marker 하나로 그 pane 의
-# 상태를 나타내고, busy 이면 뒤에 clock 이 붙는다. 색과 글리프는 값을 박지 않고
-# 옵션을 가리키므로, 옵션을 바꾸면 다음 화면 갱신에 바로 반영된다.
+# 상태를 나타내고, busy 이면 뒤에 clock 이 붙는다. 출력할 내용(marker, busy 의
+# clock)이 없으면 자리를 차지하지 않도록 아무것도 내보내지 않는다. 색과 글리프는
+# 값을 박지 않고 옵션을 가리키므로, 옵션을 바꾸면 다음 화면 갱신에 바로 반영된다.
 clock="#{?#{@agent_clock_color},#[fg=#{@agent_clock_color}],}#{@agent_clock}"
 
 ind=""
 for st in waiting idle busy; do
   if [ "$st" = busy ]; then
-    body="#{@agent_marker_$st} $clock"
+    check="#{E:@agent_pane_marker_$st}#{@agent_clock}"
+    body="#[fg=#{@agent_marker_color_$st}]#{E:@agent_pane_marker_$st}#{?#{==:#{E:@agent_pane_marker_$st},},, }$clock#[fg=#{@agent_text_color}]"
   else
-    body="#{@agent_marker_$st} "
+    check="#{E:@agent_pane_marker_$st}"
+    body="#[fg=#{@agent_marker_color_$st}]#{E:@agent_pane_marker_$st}#[fg=#{@agent_text_color}]"
   fi
-  ind+="#{?#{==:#{@agent_pane_state},$st},#[fg=#{@agent_marker_color_$st}]$body#[fg=#{@agent_text_color}],"
+  ind+="#{?#{==:#{@agent_pane_state},$st},#{?#{==:$check,},,$body},"
 done
 ind+="}}}"
 tmux set -ogq @agent_pane_indicator "$ind"

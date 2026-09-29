@@ -45,6 +45,14 @@ name, in every mux and on every OS.
  2  claude ● 1 ● 2
 ```
 
+tmux also has a `compact` window format. It removes the space between each
+marker and counter and writes the counter with superscript digits. This format
+does not change the pane indicator.
+
+```
+ 2  claude ●¹ ●²
+```
+
 The pane indicator carries the marker for that one pane. In `busy` a clock
 follows the marker.
 
@@ -77,8 +85,11 @@ The pane indicator has no such place of its own. Splice it into the pane border
 format to use it.
 
 ```tmux
-set -wg pane-border-format "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
+set -wg pane-border-format "#{pane_index} #{?#{==:#{E:@agent_pane_indicator},},,#{E:@agent_pane_indicator} }#{pane_title}"
 ```
+
+The indicator carries no leading or trailing space, so the format adds the
+space after it only when the indicator is not empty.
 
 psmux does not persist user-defined options at the pane or window scope, so
 neither the format nor the pane indicator carries over. `psmux.conf` gets a
@@ -201,18 +212,40 @@ An option takes effect within a second of being changed. Values set in
 tmux.conf before the entry point runs win, because the entry point writes its
 defaults with `set -ogq`.
 
+The old `@agent_marker*` options remain the shared fallback. A window or pane
+option takes precedence for that indicator. If a common window or pane marker
+is set before the entry point runs, its three state-specific options inherit
+it. Otherwise they inherit the matching old state-specific marker. An empty
+window marker is kept empty; only its counter remains visible.
+
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `@agent_marker` | `●` | Default marker for all three states |
 | `@agent_marker_waiting` | `@agent_marker` | Marker for `waiting` |
 | `@agent_marker_idle` | `@agent_marker` | Marker for `idle` |
 | `@agent_marker_busy` | `@agent_marker` | Marker for `busy` |
+| `@agent_window_format` | `default` | Window output format: `default` or `compact` |
+| `@agent_window_marker` | `@agent_marker` | Default marker for the three window states |
+| `@agent_window_marker_waiting` | matching shared marker | Window marker for `waiting` |
+| `@agent_window_marker_idle` | matching shared marker | Window marker for `idle` |
+| `@agent_window_marker_busy` | matching shared marker | Window marker for `busy` |
+| `@agent_pane_marker` | `@agent_marker` | Default marker for the three pane states |
+| `@agent_pane_marker_waiting` | matching shared marker | Pane marker for `waiting` |
+| `@agent_pane_marker_idle` | matching shared marker | Pane marker for `idle` |
+| `@agent_pane_marker_busy` | matching shared marker | Pane marker for `busy` |
 | `@agent_marker_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | Color of the `waiting` marker |
 | `@agent_marker_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | Color of the `idle` marker |
 | `@agent_marker_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | Color of the `busy` marker |
 | `@agent_counter_color` | empty | Color of the counter. Empty follows the marker |
 | `@agent_clock_color` | empty | Color of the clock. Empty follows the marker |
 | `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | Color of the text that follows an indicator |
+
+For example, this produces `●² ●⁴` in a tmux window while leaving pane output
+unchanged:
+
+```tmux
+set -g @agent_window_format "compact"
+```
 
 psmux does not persist these as options, so `mux/psmux/agent-status.sh` reads
 them from environment variables instead, with the same defaults falling back

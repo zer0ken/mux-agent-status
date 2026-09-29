@@ -41,6 +41,14 @@ window indicator 는 창에 속한 pane 을 상태별로 세어 marker 와 count
  2  claude ● 1 ● 2
 ```
 
+tmux 의 window indicator 는 `compact` 형식도 지원한다. `compact` 는 marker 와
+counter 사이의 공백을 없애고 counter 를 윗첨자 숫자로 표시한다. pane indicator
+의 형식은 바꾸지 않는다.
+
+```
+ 2  claude ●¹ ●²
+```
+
 pane indicator 는 그 pane 하나의 marker 를 보여준다. 상태가 `busy` 이면 marker
 뒤에 clock 이 붙는다.
 
@@ -71,8 +79,11 @@ tmux 는 포맷에서 indicator 에 닿을 수 있어서 창 이름 자체는 �
 pane indicator 는 그런 제자리가 없다. 쓰려면 pane 경계 포맷에 끼워 넣는다.
 
 ```tmux
-set -wg pane-border-format "#{pane_index} #{E:@agent_pane_indicator}#{pane_title}"
+set -wg pane-border-format "#{pane_index} #{?#{==:#{E:@agent_pane_indicator},},,#{E:@agent_pane_indicator} }#{pane_title}"
 ```
+
+indicator 는 앞뒤 공백을 포함하지 않는다. 위 포맷은 indicator 가 비어 있지 않을
+때만 뒤에 공백을 붙인다.
 
 psmux 는 사용자 정의 옵션의 pane 과 창 스코프를 저장하지 않아 포맷도 pane
 indicator 도 그대로 쓸 수 없다. `psmux.conf` 에는 별도 진입점을 넣는다.
@@ -185,18 +196,39 @@ mux-agent-status 의 나머지와 같아서 중간에 옮겨 적는 과정이 �
 옵션은 값을 바꾸면 1초 안에 반영된다. tmux.conf 에서 진입점보다 먼저 정한 값이
 우선한다. 진입점이 기본값을 `set -ogq` 로 넣기 때문이다.
 
+기존 `@agent_marker*` 옵션은 두 indicator 가 공유하는 기본값으로 남는다. window
+또는 pane 전용 옵션이 있으면 해당 indicator 는 전용 값을 우선한다. 공통 window
+marker 나 공통 pane marker 를 진입점보다 먼저 정하면 상태별 전용 옵션 세 개가
+그 값을 따른다. 공통 전용 marker 가 없으면 기존 상태별 marker 를 따른다. 빈
+window marker 는 기본 marker 로 바뀌지 않으며 counter 만 화면에 남는다.
+
 | 옵션 | 기본값 | 뜻 |
 | --- | --- | --- |
 | `@agent_marker` | `●` | 세 상태의 기본 marker |
 | `@agent_marker_waiting` | `@agent_marker` | `waiting` 의 marker |
 | `@agent_marker_idle` | `@agent_marker` | `idle` 의 marker |
 | `@agent_marker_busy` | `@agent_marker` | `busy` 의 marker |
+| `@agent_window_format` | `default` | window 출력 형식. `default` 또는 `compact` |
+| `@agent_window_marker` | `@agent_marker` | window 상태 세 개의 기본 marker |
+| `@agent_window_marker_waiting` | 대응하는 공통 marker | window `waiting` marker |
+| `@agent_window_marker_idle` | 대응하는 공통 marker | window `idle` marker |
+| `@agent_window_marker_busy` | 대응하는 공통 marker | window `busy` marker |
+| `@agent_pane_marker` | `@agent_marker` | pane 상태 세 개의 기본 marker |
+| `@agent_pane_marker_waiting` | 대응하는 공통 marker | pane `waiting` marker |
+| `@agent_pane_marker_idle` | 대응하는 공통 marker | pane `idle` marker |
+| `@agent_pane_marker_busy` | 대응하는 공통 marker | pane `busy` marker |
 | `@agent_marker_color_waiting` | ![f9e2af](https://img.shields.io/badge/waiting-%23f9e2af-f9e2af?style=flat-square&labelColor=313244) | `waiting` marker 의 색 |
 | `@agent_marker_color_idle` | ![a6e3a1](https://img.shields.io/badge/idle-%23a6e3a1-a6e3a1?style=flat-square&labelColor=313244) | `idle` marker 의 색 |
 | `@agent_marker_color_busy` | ![f38ba8](https://img.shields.io/badge/busy-%23f38ba8-f38ba8?style=flat-square&labelColor=313244) | `busy` marker 의 색 |
 | `@agent_counter_color` | 비움 | counter 의 색. 비우면 marker 색을 따른다 |
 | `@agent_clock_color` | 비움 | clock 의 색. 비우면 marker 색을 따른다 |
 | `@agent_text_color` | ![cdd6f4](https://img.shields.io/badge/text-%23cdd6f4-cdd6f4?style=flat-square&labelColor=313244) | indicator 뒤에 오는 글자의 색 |
+
+다음 설정은 tmux window 에 `●² ●⁴`를 표시하고 pane 출력은 그대로 둔다.
+
+```tmux
+set -g @agent_window_format "compact"
+```
 
 psmux 는 이 값들을 옵션으로 저장하지 못해서, `mux/psmux/agent-status.sh` 는
 같은 이름의 환경변수로 값을 읽는다. 기본값도 catppuccin mocha 의 hex 값
