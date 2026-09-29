@@ -74,26 +74,43 @@ pid_alive() {
 ORDER=(waiting idle busy)
 
 # marker 의 색과 글리프는 상태마다 따로 정한다. counter 는 색을 비워 두면
-# 자기 marker 의 색을 따른다. 매 틱마다 읽으므로 옵션을 바꾸면 바로 반영된다.
+# 자기 marker 의 색을 따른다. compact 형식은 counter 를 윗첨자로 바꾸고
+# marker 에 붙인다. 매 틱마다 읽으므로 옵션을 바꾸면 바로 반영된다.
 declare -A COLOR MARKER
 read_options() {
   local v c_wait c_idle c_busy c_text m_wait m_idle m_busy
-  v=$(tmux display-message -p '#{@agent_marker_color_waiting}|#{@agent_marker_color_idle}|#{@agent_marker_color_busy}|#{@agent_text_color}|#{@agent_marker_waiting}|#{@agent_marker_idle}|#{@agent_marker_busy}|#{@agent_counter_color}' 2>/dev/null) || return
-  IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_COLOR <<< "$v"
+  v=$(tmux display-message -p '#{@agent_marker_color_waiting}|#{@agent_marker_color_idle}|#{@agent_marker_color_busy}|#{@agent_text_color}|#{E:@agent_window_marker_waiting}|#{E:@agent_window_marker_idle}|#{E:@agent_window_marker_busy}|#{@agent_counter_color}|#{@agent_window_format}' 2>/dev/null) || return
+  IFS='|' read -r c_wait c_idle c_busy c_text m_wait m_idle m_busy COUNTER_COLOR WINDOW_FORMAT <<< "$v"
   COLOR=(  [waiting]="${c_wait:-#f9e2af}" [idle]="${c_idle:-#a6e3a1}" [busy]="${c_busy:-#f38ba8}" )
-  MARKER=( [waiting]="${m_wait:-●}"       [idle]="${m_idle:-●}"       [busy]="${m_busy:-●}" )
+  MARKER=( [waiting]="$m_wait" [idle]="$m_idle" [busy]="$m_busy" )
   TEXT_COLOR="${c_text:-#cdd6f4}"
+  case "$WINDOW_FORMAT" in default|compact) ;; *) WINDOW_FORMAT=default ;; esac
+}
+
+superscript() {
+  SUPERSCRIPT=$1
+  SUPERSCRIPT=${SUPERSCRIPT//0/⁰}
+  SUPERSCRIPT=${SUPERSCRIPT//1/¹}
+  SUPERSCRIPT=${SUPERSCRIPT//2/²}
+  SUPERSCRIPT=${SUPERSCRIPT//3/³}
+  SUPERSCRIPT=${SUPERSCRIPT//4/⁴}
+  SUPERSCRIPT=${SUPERSCRIPT//5/⁵}
+  SUPERSCRIPT=${SUPERSCRIPT//6/⁶}
+  SUPERSCRIPT=${SUPERSCRIPT//7/⁷}
+  SUPERSCRIPT=${SUPERSCRIPT//8/⁸}
+  SUPERSCRIPT=${SUPERSCRIPT//9/⁹}
 }
 
 # window indicator 를 창 이름 뒤에 놓는다. 사용자가 포맷을 다시 정하면 이어
 # 붙인 것이 사라지므로 매 틱마다 확인한다. 이미 어딘가에서 indicator 를
-# 참조하는 포맷은 사용자가 자리를 정한 것이라 건드리지 않는다.
+# 참조하는 포맷은 사용자가 자리를 정한 것이라 건드리지 않는다. indicator 는 앞뒤
+# 공백을 포함하지 않으므로 창 이름과의 공백은 indicator 가 있을 때만 붙인다.
 ensure_format() {
   local opt cur
   for opt in window-status-format window-status-current-format; do
     cur=$(tmux show-options -gv "$opt" 2>/dev/null) || continue
     case "$cur" in *@agent_window_indicator*) continue ;; esac
-    tmux set-option -g "$opt" "${cur}#{E:@agent_window_indicator}" 2>/dev/null
+    tmux set-option -g "$opt" "${cur}#{?#{==:#{E:@agent_window_indicator},},, #{E:@agent_window_indicator}}" 2>/dev/null
   done
 }
 
@@ -168,9 +185,9 @@ while :; do
       [ -n "${started[$pane]:-}" ] && since[$pane]=${started[$pane]}
       [ -n "${since[$pane]:-}" ] || since[$pane]=$now
       s=$(( now - since[$pane] )); [ "$s" -lt 0 ] && s=0
-      if   [ "$s" -lt 60 ];   then el="${s}s "
-      elif [ "$s" -lt 3600 ]; then el="$(( s / 60 ))m "
-      else                         el="$(( s / 3600 ))h "; fi
+      if   [ "$s" -lt 60 ];   then el="${s}s"
+      elif [ "$s" -lt 3600 ]; then el="$(( s / 60 ))m"
+      else                         el="$(( s / 3600 ))h"; fi
     else
       unset 'since[$pane]'; el=""
     fi
@@ -194,13 +211,31 @@ while :; do
     for s in "${ORDER[@]}"; do
       n=${count[$wid/$s]:-0}
       [ "$n" -gt 0 ] || continue
-      if [ -n "${COUNTER_COLOR:-}" ]; then
-        ind+=" #[fg=${COLOR[$s]}]${MARKER[$s]} #[fg=$COUNTER_COLOR]${n}#[fg=$TEXT_COLOR]"
+      if [ "$WINDOW_FORMAT" = compact ]; then
+        superscript "$n"
+        counter=$SUPERSCRIPT
+        gap=
       else
-        ind+=" #[fg=${COLOR[$s]}]${MARKER[$s]} ${n}#[fg=$TEXT_COLOR]"
+        counter=$n
+        gap=" "
       fi
+      part=""
+      if [ -n "${COUNTER_COLOR:-}" ]; then
+        if [ -n "${MARKER[$s]}" ]; then
+          part+="#[fg=${COLOR[$s]}]${MARKER[$s]}${gap}"
+        fi
+        part+="#[fg=$COUNTER_COLOR]${counter}#[fg=$TEXT_COLOR]"
+      else
+        if [ -n "${MARKER[$s]}" ]; then
+          part+="#[fg=${COLOR[$s]}]${MARKER[$s]}${gap}${counter}#[fg=$TEXT_COLOR]"
+        else
+          part+="#[fg=${COLOR[$s]}]${counter}#[fg=$TEXT_COLOR]"
+        fi
+      fi
+      # 상태 묶음 사이에만 공백을 둔다. indicator 앞뒤 여백은 포맷이 정한다.
+      ind+="${ind:+ }$part"
     done
-    [ "$ind" = "${prev_ind[$wid]:-}" ] && continue
+    [[ ${prev_ind[$wid]+set} ]] && [ "$ind" = "${prev_ind[$wid]}" ] && continue
     if [ -n "$ind" ]; then tmux set-option -w -t "$wid" @agent_window_indicator "$ind" 2>/dev/null
     else tmux set-option -w -t "$wid" -u @agent_window_indicator 2>/dev/null; fi
     prev_ind[$wid]=$ind
